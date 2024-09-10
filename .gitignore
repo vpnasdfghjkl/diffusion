@@ -138,3 +138,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# ckpt
+*.ckpt
+
+# zip
+*.zip
