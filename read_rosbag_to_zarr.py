@@ -26,18 +26,7 @@ video_writer = cv2.VideoWriter(output_video, fourcc, frame_rate, img_size)
 CAM_HZ=30
 TRAIN_HZ=10
 TASK_TIME=1000
-def save_to_zarr(output_zarr_path, img, aligned_state_eef_pose, aligned_delta_cmd_eef_pose, aligned_cmd_eef_pose, aligned_state_joint, aligned_cmd_joint):
-    # 创建一个Zarr存储器
-    zarr_store = ReplayBuffer.create_from_path(output_zarr_path, mode='a')
-    # 存储每个数据集
-    zarr_store.create_dataset('img', data=img, chunks=(100, 256, 256, 3), dtype='uint8')
-    zarr_store.create_dataset('aligned_state_eef_pose', data=aligned_state_eef_pose, chunks=(100, 6), dtype='float32')
-    zarr_store.create_dataset('aligned_delta_cmd_eef_pose', data=aligned_delta_cmd_eef_pose, chunks=(100, 6), dtype='float32')
-    zarr_store.create_dataset('aligned_cmd_eef_pose', data=aligned_cmd_eef_pose, chunks=(100, 6), dtype='float32')
-    zarr_store.create_dataset('aligned_state_joint', data=aligned_state_joint, chunks=(100, 7), dtype='float32')
-    zarr_store.create_dataset('aligned_cmd_joint', data=aligned_cmd_joint, chunks=(100, 7), dtype='float32')
-    print(f"Data has been saved to Zarr format at {output_zarr_path}")
-    
+
 def check_folder(CHECK_PIC_SAVE_FOLDER):
     if not os.path.exists(CHECK_PIC_SAVE_FOLDER):
         os.makedirs(CHECK_PIC_SAVE_FOLDER)
@@ -344,26 +333,24 @@ def use_rosbag_to_show(bag_name):
     print(len(img),len(aligned_state_eef_pose),len(aligned_delta_cmd_eef_pose),len(aligned_cmd_eef_pose),len(aligned_state_joint),len(aligned_cmd_joint))   
     
     # output_zarr_path = f"{save_zarr_folder}/{base_name}.zarr"
-    # save_to_zarr(output_zarr_path, img, aligned_state_eef_pose, aligned_delta_cmd_eef_pose, aligned_cmd_eef_pose, aligned_state_joint, aligned_cmd_joint)
     
     return img,aligned_state_eef_pose,aligned_delta_cmd_eef_pose,aligned_cmd_eef_pose,aligned_state_joint,aligned_cmd_joint
 
 if __name__ == "__main__":
     bag_folder_name = "2024-8-19"
-    bag_folder_path = "/home/camille/IL/diffusion_policy/rosbag/" + bag_folder_name
+    bag_folder_path = "/home/lab/hanxiao/diffusion/data/rosbag/" + bag_folder_name
     
     save_plt_folder = f"{bag_folder_path}/plt"
     save_lastPic_folder = f"{bag_folder_path}/last_pic"
-    save_zarr_folder = f"{bag_folder_path}/zarr"  # 创建Zarr存储目录
+    save_zarr_folder = f"{bag_folder_path}/zarr"  
     
     check_folder(save_plt_folder)
     check_folder(save_lastPic_folder)
-    check_folder(save_zarr_folder)  # 确保Zarr文件夹存在
-    
+    check_folder(save_zarr_folder)  
     bagpath = glob.glob(f"{bag_folder_path}/*.bag")
+    print(bagpath)
     print(len(bagpath))
     output_zarr_path = f"{save_zarr_folder}/{bag_folder_name}.zarr"
-    # save_to_zarr(output_zarr_path, img, aligned_state_eef_pose, aligned_delta_cmd_eef_pose, aligned_cmd_eef_pose, aligned_state_joint, aligned_cmd_joint)
     
     replay_buffer = ReplayBuffer.create_from_path(output_zarr_path, mode='a')
 
