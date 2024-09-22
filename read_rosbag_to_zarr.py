@@ -13,6 +13,8 @@ import math
 
 # diffusion lib======================================================
 from diffusion_policy.common.replay_buffer import ReplayBuffer
+import time
+from tqdm import tqdm
 # diffusion======================================================
 # bridge = CvBridge()
 
@@ -337,8 +339,8 @@ def use_rosbag_to_show(bag_name):
     return img,aligned_state_eef_pose,aligned_delta_cmd_eef_pose,aligned_cmd_eef_pose,aligned_state_joint,aligned_cmd_joint
 
 if __name__ == "__main__":
-    bag_folder_name = "2024-8-19"
-    bag_folder_path = "/home/lab/hanxiao/diffusion/data/rosbag/" + bag_folder_name
+    bag_folder_name = "BJ_juice1"
+    bag_folder_path = "/home/lab/hanxiao/" + bag_folder_name
     
     save_plt_folder = f"{bag_folder_path}/plt"
     save_lastPic_folder = f"{bag_folder_path}/last_pic"
@@ -354,38 +356,32 @@ if __name__ == "__main__":
     
     replay_buffer = ReplayBuffer.create_from_path(output_zarr_path, mode='a')
 
-    for path in bagpath:
+    for path in tqdm(bagpath, desc="Processing bags", unit="bag"):
+        start_time = time.time()
         print("current path", path)
         seed = replay_buffer.n_episodes
-        img01,eef_s,delta_eef_a,eef_a,joint_s,joint_a = use_rosbag_to_show(path)
-        data = list(zip(img01,eef_s,delta_eef_a))
+        img01, eef_s, delta_eef_a, eef_a, joint_s, joint_a = use_rosbag_to_show(path)
+        data = list(zip(img01, eef_s, delta_eef_a))
         grouped_data = data
-        episode=[]  
+        episode = []
         for i, (img01, state, action) in enumerate(grouped_data):
             episode.append({
                 'img': img01,
                 'state': state,
                 'action': action,
             })
-            
-        print("episode length",len(episode))
-        print("episode keys",episode[0].keys())
-        print("episode[0]['img'].shape",episode[0]['img'].shape)
-        print("episode[0]['state'].shape",episode[0]['state'].shape)
-        print("episode[0]['action'].shape",episode[0]['action'].shape)
-        
-        # import click
-        # sel = click.prompt(
-        #     "go or stop?", type=click.Choice(["g", "s"])
-        # )
-        # if sel == "go":
-        #    pass
-        # elif sel == "stop":
-        #     exit(0)
-            
+
+        print("episode length", len(episode))
+        print("episode keys", episode[0].keys())
+        print("episode[0]['img'].shape", episode[0]['img'].shape)
+        print("episode[0]['state'].shape", episode[0]['state'].shape)
+        print("episode[0]['action'].shape", episode[0]['action'].shape)
+
         data_dict = dict()
         for key in episode[0].keys():
-            data_dict[key] = np.stack(
-                [x[key] for x in episode])
+            data_dict[key] = np.stack([x[key] for x in episode])
         replay_buffer.add_episode(data_dict, compressors='disk')
         print(f'saved seed {seed}')
+
+        elapsed_time = time.time() - start_time
+        print(f"Time taken for {path}: {elapsed_time:.2f} seconds")

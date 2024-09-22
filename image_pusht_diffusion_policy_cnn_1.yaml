@@ -3,12 +3,12 @@ checkpoint:
   save_last_ckpt: true
   save_last_snapshot: false
   topk:
-    format_str: epoch={epoch:04d}-test_mean_score={test_mean_score:.3f}.ckpt
+    format_str: epoch={epoch:04d}-train_loss={train_loss:.3f}.ckpt
     k: 5
-    mode: max
-    monitor_key: test_mean_score
+    mode: min
+    monitor_key: train_loss
 dataloader:
-  batch_size: 32
+  batch_size: 128
   num_workers: 8
   persistent_workers: false
   pin_memory: true
@@ -60,9 +60,9 @@ policy:
   - 84
   diffusion_step_embed_dim: 128
   down_dims:
+  - 256
   - 512
   - 1024
-  - 2048
   eval_fixed_crop: true
   horizon: 16
   kernel_size: 5
@@ -120,22 +120,22 @@ task:
     pad_before: 1
     seed: 42
     val_ratio: 0.02
-    zarr_path: /home/lab/hanxiao/diffusion/data/rosbag/2024-8-19/zarr/2024-8-19.zarr
+    zarr_path: data/BJ_juice1/zarr/BJ_juice1.zarr
   env_runner:
-    _target_: diffusion_policy.env_runner.pusht_image_runner_1.PushTImageRunner
-    fps: 10
-    legacy_test: true
-    max_steps: 300
-    n_action_steps: 8
-    n_envs: null
-    n_obs_steps: 2
-    n_test: 50
-    n_test_vis: 4
-    n_train: 6
-    n_train_vis: 2
-    past_action: false
-    test_start_seed: 100000
-    train_start_seed: 0
+    _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner
+    # fps: 10
+    # legacy_test: true
+    # max_steps: 300
+    # n_action_steps: 8
+    # n_envs: null
+    # n_obs_steps: 2
+    # n_test: 50
+    # n_test_vis: 4
+    # n_train: 6
+    # n_train_vis: 2
+    # past_action: false
+    # test_start_seed: 100000
+    # train_start_seed: 0
   image_shape:
   - 3
   - 96
@@ -166,16 +166,16 @@ training:
   lr_warmup_steps: 500
   max_train_steps: null
   max_val_steps: null
-  num_epochs: 3050
+  num_epochs: 10
   resume: true
   rollout_every: 50
   sample_every: 5
   seed: 42
   tqdm_interval_sec: 1.0
   use_ema: true
-  val_every: 1
+  val_every: 10
 val_dataloader:
-  batch_size: 32
+  batch_size: 128
   num_workers: 8
   persistent_workers: false
   pin_memory: true

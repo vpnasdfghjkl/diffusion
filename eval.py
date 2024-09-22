@@ -1,6 +1,7 @@
 """
 Usage:
 python eval.py --checkpoint data/image/pusht/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt -o data/pusht_eval_output
+ python eval.py --checkpoint data/outputs/2024.09.18/14.06.28_train_diffusion_unet_hybrid_pusht_image/checkpoints/latest.ckpt -o data/pusht_eval_output 
 """
 
 import sys
@@ -17,6 +18,7 @@ import dill
 import wandb
 import json
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
+from diffusion_policy.common.pytorch_util import dict_apply
 
 @click.command()
 @click.option('-c', '--checkpoint', required=True)
@@ -49,6 +51,26 @@ def main(checkpoint, output_dir, device):
         cfg.task.env_runner,
         output_dir=output_dir)
     runner_log = env_runner.run(policy)
+    # generate fake obs like this：
+    '''
+    obs:
+      agent_pos:
+        shape:
+        - 7
+        type: low_dim
+      image:
+        shape:
+        - 3
+        - 96
+        - 96
+        type: rgb
+    '''
+    obs_dict={
+        'agent_pos': torch.rand(1,4,7),
+        'image': torch.rand(1,4,3, 96, 96)
+    }
+    result = policy.predict_action(obs_dict)
+    print(result)
     
     # dump log to json
     json_log = dict()

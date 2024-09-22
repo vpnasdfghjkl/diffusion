@@ -2,6 +2,7 @@
 Usage:
 Training:
 python train.py --config-name=train_diffusion_lowdim_workspace
+python  train.py --config-dir=. --config-name=image_pusht_diffusion_policy_cnn_1.yaml training.seed=42 training.device=cuda:0 hydra.run.dir='data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}'
 """
 
 import sys
