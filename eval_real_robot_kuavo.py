@@ -33,7 +33,7 @@ import pathlib
 import skvideo.io
 from omegaconf import OmegaConf
 import scipy.spatial.transform as st
-from diffusion_policy.real_world.real_env import RealEnv
+from diffusion_policy.real_world.real_env_kuavo import KuavoEnv, FakeRobot
 from diffusion_policy.real_world.spacemouse_shared_memory import Spacemouse
 from diffusion_policy.common.precise_sleep import precise_wait
 from diffusion_policy.real_world.real_inference_util import (
@@ -44,21 +44,33 @@ from diffusion_policy.workspace.base_workspace import BaseWorkspace
 from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.common.cv2_util import get_image_transform
 
-
+input="/app/data/outputs/2024.09.22/07.35.36_train_diffusion_unet_hybrid_pusht_image/checkpoints/latest.ckpt"
+output="/app/data/outputs/2024.09.22/07.35.36_train_diffusion_unet_hybrid_pusht_image/checkpoints/output"
+robot_ip="192.168.0.204"
+match_dataset="/app/data/pusht_real/real_pusht_20230105"
+match_episode=None
+vis_camera_idx=0
+init_joints=False
+steps_per_inference=6
+max_duration=60
+frequency=10
+command_latency=0.01
 OmegaConf.register_new_resolver("eval", eval, replace=True)
 
-@click.command()
-@click.option('--input', '-i', required=True, help='Path to checkpoint')
-@click.option('--output', '-o', required=True, help='Directory to save recording')
-@click.option('--robot_ip', '-ri', required=True, help="UR5's IP address e.g. 192.168.0.204")
-@click.option('--match_dataset', '-m', default=None, help='Dataset used to overlay and adjust initial condition')
-@click.option('--match_episode', '-me', default=None, type=int, help='Match specific episode from the match dataset')
-@click.option('--vis_camera_idx', default=0, type=int, help="Which RealSense camera to visualize.")
-@click.option('--init_joints', '-j', is_flag=True, default=False, help="Whether to initialize robot joint configuration in the beginning.")
-@click.option('--steps_per_inference', '-si', default=6, type=int, help="Action horizon for inference.")
-@click.option('--max_duration', '-md', default=60, help='Max duration for each epoch in seconds.')
-@click.option('--frequency', '-f', default=10, type=float, help="Control frequency in Hz.")
-@click.option('--command_latency', '-cl', default=0.01, type=float, help="Latency between receiving SapceMouse command to executing on Robot in Sec.")
+# @click.command()
+# @click.option('--input', '-i', required=True, help='Path to checkpoint')
+# @click.option('--output', '-o', required=True, help='Directory to save recording')
+# @click.option('--robot_ip', '-ri', required=True, help="UR5's IP address e.g. 192.168.0.204")
+# @click.option('--match_dataset', '-m', default=None, help='Dataset used to overlay and adjust initial condition')
+# @click.option('--match_episode', '-me', default=None, type=int, help='Match specific episode from the match dataset')
+# @click.option('--vis_camera_idx', default=0, type=int, help="Which RealSense camera to visualize.")
+# @click.option('--init_joints', '-j', is_flag=True, default=False, help="Whether to initialize robot joint configuration in the beginning.")
+# @click.option('--steps_per_inference', '-si', default=6, type=int, help="Action horizon for inference.")
+# @click.option('--max_duration', '-md', default=60, help='Max duration for each epoch in seconds.')
+# @click.option('--frequency', '-f', default=10, type=float, help="Control frequency in Hz.")
+# @click.option('--command_latency', '-cl', default=0.01, type=float, help="Latency between receiving SapceMouse command to executing on Robot in Sec.")
+
+
 def main(input, output, robot_ip, match_dataset, match_episode,
     vis_camera_idx, init_joints, 
     steps_per_inference, max_duration,
@@ -140,30 +152,17 @@ def main(input, output, robot_ip, match_dataset, match_episode,
     print("steps_per_inference:", steps_per_inference)
     print("action_offset:", action_offset)
 
-    with SharedMemoryManager() as shm_manager:
-        with Spacemouse(shm_manager=shm_manager) as sm, RealEnv(
-            output_dir=output, 
-            robot_ip=robot_ip, 
-            frequency=frequency,
-            n_obs_steps=n_obs_steps,
-            obs_image_resolution=obs_res,
-            obs_float32=True,
-            init_joints=init_joints,
-            enable_multi_cam_vis=True,
-            record_raw_video=True,
-            # number of threads per camera view for video recording (H.264)
-            thread_per_video=3,
-            # video recording quality, lower is better (but slower).
-            video_crf=21,
-            shm_manager=shm_manager) as env:
-            cv2.setNumThreads(1)
-
-            # Should be the same as demo
-            # realsense exposure
-            env.realsense.set_exposure(exposure=120, gain=0)
-            # realsense white balance
-            env.realsense.set_white_balance(white_balance=5900)
-
+    action_dim = 7
+    with KuavoEnv(
+        output_dir=output,
+        frequency=frequency,
+        n_obs_steps=2,
+        obs_image_resolution=(640, 480),
+        max_obs_buffer_size=30,
+        robot_publish_rate=125,
+        video_capture_fps=30,
+        video_capture_resolution=(1280, 720),
+        ) as env:
             print("Waiting for realsense")
             time.sleep(1.0)
 
@@ -183,87 +182,7 @@ def main(input, output, robot_ip, match_dataset, match_episode,
             print('Ready!')
             while True:
                 # ========= human control loop ==========
-                print("Human in control!")
-                state = env.get_robot_state()
-                target_pose = state['TargetTCPPose']
-                t_start = time.monotonic()
-                iter_idx = 0
-                while True:
-                    # calculate timing
-                    t_cycle_end = t_start + (iter_idx + 1) * dt
-                    t_sample = t_cycle_end - command_latency
-                    t_command_target = t_cycle_end + dt
-
-                    # pump obs
-                    obs = env.get_obs()
-
-                    # visualize
-                    episode_id = env.replay_buffer.n_episodes
-                    vis_img = obs[f'camera_{vis_camera_idx}'][-1]
-                    match_episode_id = episode_id
-                    if match_episode is not None:
-                        match_episode_id = match_episode
-                    if match_episode_id in episode_first_frame_map:
-                        match_img = episode_first_frame_map[match_episode_id]
-                        ih, iw, _ = match_img.shape
-                        oh, ow, _ = vis_img.shape
-                        tf = get_image_transform(
-                            input_res=(iw, ih), 
-                            output_res=(ow, oh), 
-                            bgr_to_rgb=False)
-                        match_img = tf(match_img).astype(np.float32) / 255
-                        vis_img = np.minimum(vis_img, match_img)
-
-                    text = f'Episode: {episode_id}'
-                    cv2.putText(
-                        vis_img,
-                        text,
-                        (10,20),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.5,
-                        thickness=1,
-                        color=(255,255,255)
-                    )
-                    cv2.imshow('default', vis_img[...,::-1])
-                    key_stroke = cv2.pollKey()
-                    if key_stroke == ord('q'):
-                        # Exit program
-                        env.end_episode()
-                        exit(0)
-                    elif key_stroke == ord('c'):
-                        # Exit human control loop
-                        # hand control over to the policy
-                        break
-
-                    precise_wait(t_sample)
-                    # get teleop command
-                    sm_state = sm.get_motion_state_transformed()
-                    # print(sm_state)
-                    dpos = sm_state[:3] * (env.max_pos_speed / frequency)
-                    drot_xyz = sm_state[3:] * (env.max_rot_speed / frequency)
-  
-                    if not sm.is_button_pressed(0):
-                        # translation mode
-                        drot_xyz[:] = 0
-                    else:
-                        dpos[:] = 0
-                    if not sm.is_button_pressed(1):
-                        # 2D translation mode
-                        dpos[2] = 0    
-
-                    drot = st.Rotation.from_euler('xyz', drot_xyz)
-                    target_pose[:3] += dpos
-                    target_pose[3:] = (drot * st.Rotation.from_rotvec(
-                        target_pose[3:])).as_rotvec()
-                    # clip target pose
-                    target_pose[:2] = np.clip(target_pose[:2], [0.25, -0.45], [0.77, 0.40])
-
-                    # execute teleop command
-                    env.exec_actions(
-                        actions=[target_pose], 
-                        timestamps=[t_command_target-time.monotonic()+time.time()])
-                    precise_wait(t_cycle_end)
-                    iter_idx += 1
+                print("skip Human in control!")
                 
                 # ========== policy control loop ==============
                 try:
@@ -303,49 +222,15 @@ def main(input, output, robot_ip, match_dataset, match_episode,
                             action = result['action'][0].detach().to('cpu').numpy()
                             print('Inference latency:', time.time() - s)
                         
-                        # convert policy action to env actions
-                        if delta_action:
-                            assert len(action) == 1
-                            if perv_target_pose is None:
-                                perv_target_pose = obs['robot_eef_pose'][-1]
-                            this_target_pose = perv_target_pose.copy()
-                            this_target_pose[[0,1]] += action[-1]
-                            perv_target_pose = this_target_pose
-                            this_target_poses = np.expand_dims(this_target_pose, axis=0)
-                        else:
-                            this_target_poses = np.zeros((len(action), len(target_pose)), dtype=np.float64)
-                            this_target_poses[:] = target_pose
-                            this_target_poses[:,[0,1]] = action
-
-                        # deal with timing
-                        # the same step actions are always the target for
-                        action_timestamps = (np.arange(len(action), dtype=np.float64) + action_offset
-                            ) * dt + obs_timestamps[-1]
-                        action_exec_latency = 0.01
-                        curr_time = time.time()
-                        is_new = action_timestamps > (curr_time + action_exec_latency)
-                        if np.sum(is_new) == 0:
-                            # exceeded time budget, still do something
-                            this_target_poses = this_target_poses[[-1]]
-                            # schedule on next available step
-                            next_step_idx = int(np.ceil((curr_time - eval_t_start) / dt))
-                            action_timestamp = eval_t_start + (next_step_idx) * dt
-                            print('Over budget', action_timestamp - curr_time)
-                            action_timestamps = np.array([action_timestamp])
-                        else:
-                            this_target_poses = this_target_poses[is_new]
-                            action_timestamps = action_timestamps[is_new]
-
-                        # clip actions
-                        this_target_poses[:,:2] = np.clip(
-                            this_target_poses[:,:2], [0.25, -0.45], [0.77, 0.40])
+                        # # clip actions
+                        # this_target_poses[:,:2] = np.clip(
+                        #     this_target_poses[:,:2], [0.25, -0.45], [0.77, 0.40])
 
                         # execute actions
                         env.exec_actions(
-                            actions=this_target_poses,
-                            timestamps=action_timestamps
+                            actions=action,
                         )
-                        print(f"Submitted {len(this_target_poses)} steps of actions.")
+                        print(f"Submitted {len(action)} steps of actions.")
 
                         # visualize
                         episode_id = env.replay_buffer.n_episodes

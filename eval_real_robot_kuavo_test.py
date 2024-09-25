@@ -33,7 +33,7 @@ import pathlib
 import skvideo.io
 from omegaconf import OmegaConf
 import scipy.spatial.transform as st
-# from diffusion_policy.real_world.real_env import RealEnv
+from diffusion_policy.real_world.real_env_kuavo import KuavoEnv, FakeRobot
 # from diffusion_policy.real_world.spacemouse_shared_memory import Spacemouse
 from diffusion_policy.common.precise_sleep import precise_wait
 from diffusion_policy.real_world.real_inference_util import (
@@ -44,5 +44,37 @@ from diffusion_policy.workspace.base_workspace import BaseWorkspace
 from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.common.cv2_util import get_image_transform
 
+input="/app/data/outputs/2024.09.22/07.35.36_train_diffusion_unet_hybrid_pusht_image/checkpoints/latest.ckpt"
+output="/app/data/outputs/2024.09.22/07.35.36_train_diffusion_unet_hybrid_pusht_image/checkpoints/output"
+robot_ip="192.168.0.204"
+match_dataset="/app/data/pusht_real/real_pusht_20230105"
+match_episode=None
+vis_camera_idx=0
+init_joints=False
+steps_per_inference=6
+max_duration=60
+frequency=10
+command_latency=0.01
+import threading
+fake_robot = FakeRobot()
 
-
+t = threading.Thread(target=fake_robot.run)
+t.start()
+# event = threading.Event()
+with KuavoEnv(
+    output_dir=output,
+    frequency=frequency,
+    n_obs_steps=2,
+    obs_image_resolution=(640, 480),
+    max_obs_buffer_size=30,
+    robot_publish_rate=125,
+    video_capture_fps=30,
+    video_capture_resolution=(1280, 720),
+    ) as env:
+    # fake_obs=env.get_fake_obs()
+#     while not env.is_ready:
+#         print(env.is_ready)
+#     print("Ready")
+    # real_obs=env.get_obs()
+    while 1:
+        print(env.is_ready)

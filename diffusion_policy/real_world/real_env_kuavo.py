@@ -5,17 +5,17 @@ import time
 import shutil
 import math
 from multiprocessing.managers import SharedMemoryManager
-from diffusion_policy.real_world.rtde_interpolation_controller import (
-    RTDEInterpolationController,
-)
-from diffusion_policy.real_world.multi_realsense import MultiRealsense, SingleRealsense
+# from diffusion_policy.real_world.rtde_interpolation_controller import (
+#     RTDEInterpolationController,
+# )
+# from diffusion_policy.real_world.multi_realsense import MultiRealsense, SingleRealsense
 from diffusion_policy.real_world.video_recorder import VideoRecorder
 from diffusion_policy.common.timestamp_accumulator import (
     TimestampObsAccumulator,
     TimestampActionAccumulator,
     align_timestamps,
 )
-from diffusion_policy.real_world.multi_camera_visualizer import MultiCameraVisualizer
+# from diffusion_policy.real_world.multi_camera_visualizer import MultiCameraVisualizer
 from diffusion_policy.common.replay_buffer import ReplayBuffer
 from diffusion_policy.common.cv2_util import get_image_transform, optimal_row_cols
 
@@ -53,19 +53,61 @@ DEFAULT_ACT_KEY_MAP = {
 HAND_OPEN_STATE = "[0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"
 # GRIPPER_CLOSE_STATE = "[30, 30, 90, 90, 90, 90, 30, 30, 90, 90, 90, 90]"
 HAND_CLOSE_STATE = "[30, 30, 90, 90, 90, 90, 0, 0, 0, 0, 0, 0]"
+class FakeRobot:
+    def __init__(self):
+        # Initialize ROS node
+        rospy.init_node('fake_robot', anonymous=True)
 
+        # Publishers for the specified topics
+        self.obs_img01_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_img01"], CompressedImage, queue_size=10)
+        self.obs_state_hand_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_state_hand"], robotHandPosition, queue_size=10)
+        self.obs_state_eef_pose_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_state_eef_pose"], recordArmHandPose, queue_size=10)
+        self.obs_cmd_eef_pose_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_cmd_eef_pose"], recordArmHandPose, queue_size=10)
+
+    def publish_img01(self, image_msg):
+        self.obs_img01_pub.publish(image_msg)
+
+    def publish_state_hand(self, hand_position_msg):
+        self.obs_state_hand_pub.publish(hand_position_msg)
+
+    def publish_eef_pose(self, eef_pose_msg):
+        self.obs_state_eef_pose_pub.publish(eef_pose_msg)
+
+    def publish_cmd_eef_pose(self, cmd_eef_pose_msg):
+        self.obs_cmd_eef_pose_pub.publish(cmd_eef_pose_msg)
+
+    def run(self):
+        rate = rospy.Rate(100)  # Publish at 10 Hz
+        while not rospy.is_shutdown():
+            # Here you can create and publish messages
+            # For example:
+            image_msg = CompressedImage()  # Populate your image message here
+            self.publish_img01(image_msg)
+
+            hand_position_msg = robotHandPosition()  # Populate your hand position message here
+            self.publish_state_hand(hand_position_msg)
+
+            eef_pose_msg = recordArmHandPose()  # Populate your eef pose message here
+            self.publish_eef_pose(eef_pose_msg)
+
+            cmd_eef_pose_msg = recordArmHandPose()  # Populate your command eef pose message here
+            self.publish_cmd_eef_pose(cmd_eef_pose_msg)
+
+            rate.sleep()
+    
 class ObsBuffer:
     def __init__(self, img_buffer_size: int = 30, robot_state_buffer_size: int = 120):
         self.img_buffer_size = img_buffer_size
+        self.robot_state_buffer_size = robot_state_buffer_size
         self.obs_buffer_data = {key: {"data": deque(maxlen=img_buffer_size),"timestamp": deque(maxlen=img_buffer_size),} for key in DEFAULT_OBS_KEY_MAP if "obs_img" in key}
         self.obs_buffer_data.update({key: {"data": deque(maxlen=robot_state_buffer_size),"timestamp": deque(maxlen=robot_state_buffer_size),} for key in DEFAULT_OBS_KEY_MAP if "obs_img" not in key})
      
         # Subscribe to the ROS topics
-        rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_img01"],CompressedImage,lambda msg: self.image_callback(msg, "obs_img01"),)
-        rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_hand"],robotHandPosition,lambda msg: self.left_control_hand(msg, "obs_state_hand"),)
+        self.obs_img01_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_img01"],CompressedImage,lambda msg: self.image_callback(msg, "obs_img01"),)
+        self.obs_state_hand_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_hand"],robotHandPosition,lambda msg: self.left_control_hand(msg, "obs_state_hand"),)
 
-        rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_state_eef_pose"),)
-        rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_cmd_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_cmd_eef_pose"),)
+        self.obs_state_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_state_eef_pose"),)
+        self.obs_cmd_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_cmd_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_cmd_eef_pose"),)
 
     def image_callback(self, msg: CompressedImage, key: str):
         np_arr = np.frombuffer(msg.data, np.uint8)
@@ -96,13 +138,27 @@ class ObsBuffer:
         self.obs_buffer_data[key]["data"].append(xyzrpy)
         self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
 
+    def obs_buffer_is_ready(self):
+        print(len(self.obs_buffer_data["obs_img01"]["data"]))
+        print(len(self.obs_buffer_data["obs_state_hand"]["data"]))
+        print(len(self.obs_buffer_data["obs_state_eef_pose"]["data"]))
+        print(len(self.obs_buffer_data["obs_cmd_eef_pose"]["timestamp"]))
+        return all([len(self.obs_buffer_data[key]["data"]) == self.img_buffer_size for key in DEFAULT_OBS_KEY_MAP if "obs_img" in key]) and \
+               all([len(self.obs_buffer_data[key]["data"]) == self.robot_state_buffer_size for key in DEFAULT_OBS_KEY_MAP if "obs_img" not in key])
+
+    def stop_subscribers(self):
+        self.obs_img01_suber.unregister()
+        self.obs_state_hand_suber.unregister()
+        self.obs_state_eef_pose_suber.unregister()
+        self.obs_cmd_eef_pose_suber.unregister()
+
     def get_lastest_k_img(self, k: int) -> Dict[int, Dict[str, np.ndarray]]:
         out = {}
         for i, key in enumerate(DEFAULT_OBS_KEY_MAP):
             if "obs_img" in key:
                 out[i] = {
-                    "color": np.array(self.obs_buffer_data[key]["data"][-k:]),
-                    "timestamp": np.array(self.obs_buffer_data[key]["timestamp"][-k:]),
+                    "color": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
+                    "timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
                 }
         return out
 
@@ -111,8 +167,8 @@ class ObsBuffer:
         for i, key in enumerate(DEFAULT_OBS_KEY_MAP):
             if "obs_img" not in key:
                 out[key] = {
-                    "data": np.array(self.obs_buffer_data[key]["data"][-k:]),
-                    "robot_receive_timestamp": np.array(self.obs_buffer_data[key]["timestamp"][-k:]),
+                    "data": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
+                    "robot_receive_timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
                 }
         return out
 
@@ -254,36 +310,31 @@ class KuavoEnv:
     # ======== start-stop API =============
     @property
     def is_ready(self):
-        return self.realsense.is_ready and self.robot.is_ready
+        return self.obs_buffer.obs_buffer_is_ready()
 
     def start(self, wait=True):
-        self.realsense.start(wait=False)
-        self.robot.start(wait=False)
-        if self.multi_cam_vis is not None:
-            self.multi_cam_vis.start(wait=False)
-        if wait:
-            self.start_wait()
+        print(self.is_ready)
+        # self.realsense.start(wait=False)
+        # self.robot.start(wait=False)
+        # if self.multi_cam_vis is not None:
+        #     self.multi_cam_vis.start(wait=False)
+        # if wait:
+        #     self.start_wait()
 
-    def stop(self, wait=True):
-        self.end_episode()
-        if self.multi_cam_vis is not None:
-            self.multi_cam_vis.stop(wait=False)
-        self.robot.stop(wait=False)
-        self.realsense.stop(wait=False)
-        if wait:
-            self.stop_wait()
+    def stop(self):
+        self.obs_buffer.stop_subscribers()
 
-    def start_wait(self):
-        self.realsense.start_wait()
-        self.robot.start_wait()
-        if self.multi_cam_vis is not None:
-            self.multi_cam_vis.start_wait()
+    # def start_wait(self):
+    #     self.realsense.start_wait()
+    #     self.robot.start_wait()
+    #     if self.multi_cam_vis is not None:
+    #         self.multi_cam_vis.start_wait()
 
-    def stop_wait(self):
-        self.robot.stop_wait()
-        self.realsense.stop_wait()
-        if self.multi_cam_vis is not None:
-            self.multi_cam_vis.stop_wait()
+    # def stop_wait(self):
+    #     self.robot.stop_wait()
+    #     self.realsense.stop_wait()
+    #     if self.multi_cam_vis is not None:
+    #         self.multi_cam_vis.stop_wait()
 
     # ========= context manager ===========
     def __enter__(self):
@@ -293,6 +344,15 @@ class KuavoEnv:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
 
+    def get_fake_obs(self):
+        return {
+            "camera_0": np.random.rand(2, 256, 256, 3),
+            "robot_state_obs_state_hand": np.random.rand(2, 12),
+            "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
+            "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
+            "timestamp": np.random.rand(2),
+        }
+        
     # ========= async env API ===========
     def get_obs(self) -> dict:
         "observation dict"
@@ -401,9 +461,7 @@ class KuavoEnv:
         # if self.stage_accumulator is not None:
         #     self.stage_accumulator.put(new_stages, new_timestamps)
 
-    def get_robot_state(self):
-        return self.robot.get_state()
-
+    # ========= recording API ===========
     # recording API
     def start_episode(self, start_time=None):
         "Start recording and return first obs"
