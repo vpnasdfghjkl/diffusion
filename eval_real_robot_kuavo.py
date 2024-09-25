@@ -165,7 +165,13 @@ def main(input, output, robot_ip, match_dataset, match_episode,
         ) as env:
             print("Waiting for realsense")
             time.sleep(1.0)
-
+            '''
+            {
+                'camera_0': (2, 3, 256, 256),
+                'state': (2, 7),
+                'timestamps': (2, ),
+            }
+            '''
             print("Warming up policy inference")
             obs = env.get_obs()
             with torch.no_grad():

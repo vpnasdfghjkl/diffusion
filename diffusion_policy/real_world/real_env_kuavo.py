@@ -345,12 +345,19 @@ class KuavoEnv:
         self.stop()
 
     def get_fake_obs(self):
+        # return {
+        #     "camera_0": np.random.rand(2, 96, 96, 3),
+        #     "robot_state_obs_state_hand": np.random.rand(2, 12),
+        #     "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
+        #     "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
+        #     "timestamp": np.random.rand(2),
+        # }
         return {
-            "camera_0": np.random.rand(2, 256, 256, 3),
-            "robot_state_obs_state_hand": np.random.rand(2, 12),
-            "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
-            "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
-            "timestamp": np.random.rand(2),
+            "img": np.random.rand(2, 3, 96, 96),
+            "agent_pos": np.random.rand(2, 2),
+            # "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
+            # "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
+            # "timestamp": np.random.rand(2),
         }
         
     # ========= async env API ===========
@@ -431,8 +438,17 @@ class KuavoEnv:
 
         # return obs
         obs_data = dict(camera_obs)
-        obs_data.update(robot_obs)
+        
+        
+        history_hand = robot_obs["robot_state_obs_state_hand"]
+        history_eef_pose = robot_obs["robot_state_obs_state_eef_pose"]
+        # add the 1dim hand to 6dim eef_pose
+        
+        robot_final_obs = dict()
+        robot_final_obs["state"] = np.concatenate((history_eef_pose, history_hand), axis=1)
+        obs_data.update(robot_final_obs)
         obs_data["timestamp"] = obs_align_timestamps
+        
         return obs_data
 
     def exec_actions(
