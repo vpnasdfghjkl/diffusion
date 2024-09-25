@@ -345,6 +345,9 @@ class KuavoEnv:
         self.stop()
 
     def get_fake_obs(self):
+        '''
+        img:(T,H,W,C)
+        '''
         # return {
         #     "camera_0": np.random.rand(2, 96, 96, 3),
         #     "robot_state_obs_state_hand": np.random.rand(2, 12),
@@ -353,7 +356,7 @@ class KuavoEnv:
         #     "timestamp": np.random.rand(2),
         # }
         return {
-            "img": np.random.rand(2, 3, 96, 96),
+            "img": np.random.rand(2, 256, 256, 3),
             "agent_pos": np.random.rand(2, 2),
             # "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
             # "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
