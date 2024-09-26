@@ -60,7 +60,7 @@ class PushTImageDataset(BaseImageDataset):
     def get_normalizer(self, mode='limits', **kwargs):
         data = {
             'action': self.replay_buffer['action'],
-            'agent_pos': self.replay_buffer['state'][...,:7]
+            'agent_pos': self.replay_buffer['state']
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -71,13 +71,13 @@ class PushTImageDataset(BaseImageDataset):
         return len(self.sampler)
 
     def _sample_to_data(self, sample):
-        agent_pos = sample['state'][:,:7].astype(np.float32) # (agent_posx2, block_posex3)
+        agent_pos = sample['state'].astype(np.float32) # (agent_posx2, block_posex3)
         image = np.moveaxis(sample['img'],-1,1)/255
 
         data = {
             'obs': {
-                'image': image, # T, 3, 96, 96
-                'agent_pos': agent_pos, # T, 2
+                'image': image, # T, C, H, W
+                'agent_pos': agent_pos, # T, Do
             },
             'action': sample['action'].astype(np.float32) # T, 2
         }
@@ -92,12 +92,13 @@ class PushTImageDataset(BaseImageDataset):
 
 def test():
     import os
-    zarr_path = os.path.expanduser('/home/lab/hanxiao/diffusion/data/rosbag/2024-8-19/zarr/2024-8-19.zarr')
+    zarr_path = os.path.expanduser('/app/data/BJ_juice1/zarr/BJ_juice1.zarr')
     dataset = PushTImageDataset(zarr_path, horizon=16)
 
     from matplotlib import pyplot as plt
     normalizer = dataset.get_normalizer()
     nactions = normalizer['action'].normalize(dataset.replay_buffer['action'])
+    
     diff = np.diff(nactions, axis=0)
     dists = np.linalg.norm(np.diff(nactions, axis=0), axis=-1)
     plt.figure(figsize=(10, 5))

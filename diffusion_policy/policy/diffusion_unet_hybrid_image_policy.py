@@ -42,7 +42,7 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
 
         # parse shape_meta
         action_shape = shape_meta['action']['shape']
-        assert len(action_shape) == 1
+        assert len(action_shape) == 1 #?
         action_dim = action_shape[0]
         obs_shape_meta = shape_meta['obs']
         obs_config = {

@@ -35,6 +35,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         action_shape = shape_meta['action']['shape']
         assert len(action_shape) == 1
         action_dim = action_shape[0]
+        
         # get feature dim
         obs_feature_dim = obs_encoder.output_shape()[0]
 

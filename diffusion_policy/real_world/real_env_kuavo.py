@@ -348,19 +348,15 @@ class KuavoEnv:
         '''
         img:(T,H,W,C)
         '''
-        # return {
-        #     "camera_0": np.random.rand(2, 96, 96, 3),
-        #     "robot_state_obs_state_hand": np.random.rand(2, 12),
-        #     "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
-        #     "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
-        #     "timestamp": np.random.rand(2),
-        # }
+        import datetime
+        first_timestamp = datetime.datetime.now().timestamp()
+        second_timestamp = first_timestamp + 0.1
         return {
-            "img": np.random.rand(2, 256, 256, 3),
-            "agent_pos": np.random.rand(2, 2),
+            "image": np.random.rand(2, 480, 640, 3),
+            "agent_pos": np.random.rand(2, 7),
             # "robot_state_obs_state_eef_pose": np.random.rand(2, 6),
             # "robot_state_obs_cmd_eef_pose": np.random.rand(2, 6),
-            # "timestamp": np.random.rand(2),
+            "timestamp": np.array([first_timestamp, second_timestamp])
         }
         
     # ========= async env API ===========
@@ -453,13 +449,20 @@ class KuavoEnv:
         obs_data["timestamp"] = obs_align_timestamps
         
         return obs_data
-
+    
+    def exec_fake_actions(self, actions: np.ndarray):
+        # just print the new actions
+        if not isinstance(actions, np.ndarray):
+            actions = np.array(actions)
+        print(f"executing actions: {actions.shape}")
+        return
+    
     def exec_actions(
         self,
         actions: np.ndarray,
     ):  
         # actions: (T, D) == (T, 6 + 1)
-        assert self.is_ready
+        # assert self.is_ready
         if not isinstance(actions, np.ndarray):
             actions = np.array(actions)
 
