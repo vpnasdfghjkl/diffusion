@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // python train.py --config-name=train_diffusion_unet_real_image_workspace task.dataset_path=data/pusht_real/real_pusht_20230105/
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "debug cchi's real_pusht dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config-name=train_diffusion_unet_real_image_workspace",
+                "task.dataset_path=data/pusht_real/real_pusht_20230105/"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "debug first task dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config-name=train_diffusion_unet_real_image_workspace_first_task",
+            ],
+            "justMyCode": true
+        },
+        {
+            // training.seed=42 training.device=cuda:0 hydra.run.dir='data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}'
+            "name": "debug my rosbag dataset",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config-dir=.",
+                "--config-name=image_pusht_diffusion_policy_cnn_1.yaml",
+                "training.seed=42",
+                "training.device=cuda:0",
+                "hydra.run.dir='data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}'"
+            ],
+            "justMyCode": true
+        }
+    ]
+}
