@@ -24,7 +24,8 @@
             "program": "${workspaceFolder}/train.py",
             "console": "integratedTerminal",
             "args": [
-                "--config-name=train_diffusion_unet_real_image_workspace_first_task",
+                // "--config-name=train_diffusion_unet_real_image_workspace_first_task",
+                "--config-name=train_diffusion_unet_real_image_workspace_SongLingPickPlace_task",
             ],
             "justMyCode": true
         },

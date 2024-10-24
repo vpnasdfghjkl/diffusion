@@ -16,7 +16,8 @@ def get_real_obs_dict(
             t,hi,wi,ci = this_imgs_in.shape
             co,ho,wo = shape
             assert ci == co
-            out_imgs = this_imgs_in
+            divide = 255
+            out_imgs = this_imgs_in / divide
             if (ho != hi) or (wo != wi) or (this_imgs_in.dtype == np.uint8):
                 tf = get_image_transform(
                     input_res=(wi,hi), 
