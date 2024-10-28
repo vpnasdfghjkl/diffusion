@@ -99,8 +99,11 @@ class ObsBuffer:
     def __init__(self, img_buffer_size: int = 30, robot_state_buffer_size: int = 120):
         self.img_buffer_size = img_buffer_size
         self.robot_state_buffer_size = robot_state_buffer_size
-        self.obs_buffer_data = {key: {"data": deque(maxlen=img_buffer_size),"timestamp": deque(maxlen=img_buffer_size),} for key in DEFAULT_OBS_KEY_MAP if "obs_img" in key}
-        self.obs_buffer_data.update({key: {"data": deque(maxlen=robot_state_buffer_size),"timestamp": deque(maxlen=robot_state_buffer_size),} for key in DEFAULT_OBS_KEY_MAP if "obs_img" not in key})
+        self.obs_buffer_data = {key: {"data": deque(maxlen=img_buffer_size),"timestamp": deque(maxlen=img_buffer_size),} \
+                                for key in DEFAULT_OBS_KEY_MAP if "obs_img" in key}
+        
+        self.obs_buffer_data.update({key: {"data": deque(maxlen=robot_state_buffer_size),"timestamp": deque(maxlen=robot_state_buffer_size),} \
+                                    for key in DEFAULT_OBS_KEY_MAP if "obs_img" not in key})
      
         # Subscribe to the ROS topics
         self.obs_img01_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_img01"],CompressedImage,lambda msg: self.image_callback(msg, "obs_img01"),)
