@@ -250,8 +250,20 @@ class RealEnv:
         self.last_realsense_data = self.realsense.get(
             k=k, 
             out=self.last_realsense_data)
-
-        # 125 hz, robot_receive_timestamp
+        
+        
+        # frequency 10 Hz, 
+        
+        # camera, 50 Hz, buffer_size = 12
+        # 0.00 0.02 0.04 0.06 0.08 0.10 | 0.12 0.14 0.16 0.18 0.20 0.22
+        # 0.001 0.021 0.041 0.061 0.081 0.101 | 0.121 0.141 0.161 0.181 0.201 0.221
+        
+        # 100 Hz, buffer_size= 23
+        # 0.00 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.10 0.11 0.12 0.13 0.14 0.15 0.16 0.17 0.18 0.19 0.20 0.21 0.22 
+        
+        
+        
+        # robot, 125 hz, robot_receive_timestamp
         last_robot_data = self.robot.get_all_state()
         # both have more than n_obs_steps data
 

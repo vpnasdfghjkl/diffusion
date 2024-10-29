@@ -23,7 +23,7 @@ class PushTImageDataset(BaseImageDataset):
         
         super().__init__()
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            zarr_path, keys=['img', 'state', 'action'])
+            zarr_path, keys=['img01', 'img02', 'state', 'action'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, 
             val_ratio=val_ratio,
@@ -64,7 +64,8 @@ class PushTImageDataset(BaseImageDataset):
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
-        normalizer['image'] = get_image_range_normalizer()
+        normalizer['img01'] = get_image_range_normalizer()
+        normalizer['img02'] = get_image_range_normalizer()
         return normalizer
 
     def __len__(self) -> int:
@@ -72,11 +73,13 @@ class PushTImageDataset(BaseImageDataset):
 
     def _sample_to_data(self, sample):
         agent_pos = sample['state'].astype(np.float32) # (agent_posx2, block_posex3)
-        image = np.moveaxis(sample['img'],-1,1)/255
+        img01 = np.moveaxis(sample['img01'],-1,1)/255
+        img02 = np.moveaxis(sample['img02'],-1,1)/255
 
         data = {
             'obs': {
-                'image': image, # T, C, H, W
+                'img01': img01, # T, C, H, W
+                'img02': img02, # T, C, H, W
                 'agent_pos': agent_pos, # T, Do
             },
             'action': sample['action'].astype(np.float32) # T, 2
@@ -92,12 +95,12 @@ class PushTImageDataset(BaseImageDataset):
 
 def test():
     import os
-    zarr_path = os.path.expanduser('/app/data/BJ_juice1/zarr/BJ_juice1.zarr')
+    zarr_path = os.path.expanduser('/app/data/zarr/SongLingPickPlace.zarr')
     dataset = PushTImageDataset(zarr_path, horizon=16)
 
     from matplotlib import pyplot as plt
     normalizer = dataset.get_normalizer()
-    nactions = normalizer['agent_pos'].normalize(dataset.replay_buffer['state'])
+    nactions = normalizer['action'].normalize(dataset.replay_buffer['action'])
     
     diff = np.diff(nactions, axis=0)
     dists = np.linalg.norm(np.diff(nactions, axis=0), axis=-1)
@@ -107,6 +110,8 @@ def test():
     plt.ylabel('Action Distance')
     plt.title('Action Distance over Time')
     plt.savefig('pusht_action_distance.png')
+    
+    
 if "__main__" == __name__:
     test()
     print("here")
