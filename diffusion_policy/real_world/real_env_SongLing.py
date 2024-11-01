@@ -12,7 +12,7 @@ import time
 from tqdm import tqdm  
 import matplotlib.pyplot as plt
 import pathlib
-import keyboard
+
 DEFAULT_OBS_KEY_MAP = {
     "img":{
         "img01": "/camera_f/color/image_raw",
@@ -146,6 +146,7 @@ class SongLingActor:
     def publish_target_pose(self, pose: np.ndarray):
         msg = JointState()
         msg.position = pose.tolist()  # 假设你想要传递位置
+        msg.velocity
         msg.header.stamp = rospy.Time.now()  # 添加时间戳
         msg.name = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"]  # 自定义关节名称
         self.target_pub.publish(msg)
@@ -208,10 +209,12 @@ class SongLingEnv:
         new_actions = actions
         for i in range(len(new_actions)):
             self.target_publisher.publish_target_pose(new_actions[i])
+            time.sleep(0.13)
     
     
     def close(self):
         self.obs_buffer.stop_subscribers()
+        self.target_publisher.target_pub.unregister()
     
     def is_ready(self):
         return self.obs_buffer.obs_buffer_is_ready()
@@ -222,7 +225,7 @@ class SongLingEnv:
 
         # get data
         # 30 Hz, camera_receive_timestamp
-        k = math.ceil(self.n_obs_steps * (self.video_capture_fps / self.frequency))
+        k_image = math.ceil(self.n_obs_steps * (self.video_capture_fps / self.frequency))
 
         """
         Return order T,H,W,C
@@ -234,7 +237,7 @@ class SongLingEnv:
             1: ...
         }
         """
-        self.last_realsense_data = self.obs_buffer.get_lastest_k_img(k)
+        self.last_realsense_data = self.obs_buffer.get_lastest_k_img(k_image)
         
         
         
@@ -248,9 +251,8 @@ class SongLingEnv:
             1: ...
         }
         """
-        last_robot_data = self.obs_buffer.get_latest_k_robotstate(
-            k * (self.robot_publish_rate // self.video_capture_fps)
-        )
+        k_robot = math.ceil(self.n_obs_steps * (self.robot_publish_rate / self.frequency))
+        last_robot_data = self.obs_buffer.get_latest_k_robotstate(k_robot)
         # both have more than n_obs_steps data
         
         # align camera obs timestamps

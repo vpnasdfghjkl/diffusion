@@ -45,16 +45,18 @@ from diffusion_policy.workspace.base_workspace import BaseWorkspace
 from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.common.cv2_util import get_image_transform
 import rospy
+import rosbag
+input="/relative_folder/SATA/latest.ckpt"
+output="/relative_folder/SATA/output"
+vis_camera_idx = 1  # camera_f
+rosbag_path = "/relative_folder/SATA/dataset/pick_place_241021_kcds21f/pick_place_2024-10-21-21-07-12.bag"
 
-input="/app/data/outputs/2024.10.24/19.52.58_train_diffusion_unet_image_SongLingPickPlace_task/checkpoints/latest.ckpt"
-output="/app/data/outputs/2024.10.24/19.52.58_train_diffusion_unet_image_SongLingPickPlace_task/checkpoints/output"
 robot_ip="192.168.0.204"
 match_dataset="/app/data/SongLing/SongLingPickPlace.zarr"
 
 match_episode=None
-vis_camera_idx=0
 init_joints=False
-steps_per_inference=6
+steps_per_inference=15
 max_duration=60
 frequency=10
 command_latency=0.01
@@ -75,6 +77,35 @@ OmegaConf.register_new_resolver("eval", eval, replace=True)
 
 
 def main():
+    
+    # bag = rosbag.Bag(rosbag_path, 'r')
+    # for topic, msg, t in bag.read_messages(topics=[ 
+    #         '/camera_f/color/image_raw',\
+    #         '/camera_r/color/image_raw',
+    #       ]):
+    #     if topic=='/camera_f/color/image_raw':
+    #         np_arr = np.frombuffer(msg.data, np.uint8)
+    #         try:
+    #             cv_img = np_arr.reshape((480, 640, 3))  # 这里根据实际图像尺寸调整
+    #             cv_img = cv2.resize(cv_img, (256, 256))
+    #             # always show the image
+    #             cv2.imshow('default_f', cv_img[..., ::-1])
+    #             cv2.waitKey(1)
+    #         except ValueError as e:
+    #             print(f"Error reshaping the image: {e}")
+    #     if topic=='/camera_r/color/image_raw':
+    #         np_arr = np.frombuffer(msg.data, np.uint8)
+    #         try:
+    #             cv_img = np_arr.reshape((480, 640, 3))  # 这里根据实际图像尺寸调整
+    #             cv_img = cv2.resize(cv_img, (256, 256))
+    #             # always show the image which is rgb format
+    #             cv2.imshow('default_r', cv_img[..., ::-1])
+    #             cv2.waitKey(1)
+    #         except ValueError as e:
+    #             print(f"Error reshaping the image: {e}")
+    #     break
+    # bag.close()
+    
     steps_per_inference=6
     # load checkpoint
     ckpt_path = input
@@ -176,6 +207,13 @@ def main():
                 # assert action.shape[-1] == 2
                 del result
 
+            output_file = 'SongLing.mp4'
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 mp4v 编码器
+            fps = 10  # 帧率
+            vis_img = obs[f'img0{vis_camera_idx}'][-1]
+            height, width = vis_img.shape[:2]
+            out = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+            
             print('Ready!')
             while True:
                 # ========= human control loop ==========
@@ -217,7 +255,7 @@ def main():
                             result = policy.predict_action(obs_dict)
                             # this action starts from the first obs step
                             action = result['action'][0].detach().to('cpu').numpy()
-                            print('Inference latency:', time.time() - s)
+                            print('Inference latency:', time.time() - s)    # 0.4s
                         
                         # # clip actions
                         # this_target_poses[:,:2] = np.clip(
@@ -229,31 +267,41 @@ def main():
                         )
                         print(f"Submitted {len(action)} steps of actions.")
 
-                        # # visualize
+                        # visualize
                         # episode_id = env.replay_buffer.n_episodes
-                        # vis_img = obs[f'camera_{vis_camera_idx}'][-1]
+                        vis_img = obs[f'img0{vis_camera_idx}'][-2:]
                         # text = 'Episode: {}, Time: {:.1f}'.format(
                         #     episode_id, time.monotonic() - t_start
                         # )
-                        # cv2.putText(
-                        #     vis_img,
-                        #     text,
-                        #     (10,20),
-                        #     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        #     fontScale=0.5,
-                        #     thickness=1,
-                        #     color=(255,255,255)
-                        # )
-                        # cv2.imshow('default', vis_img[...,::-1])
+                        
+                        for i in range(len(vis_img)):
+                            text = 'SongLing Task: Time: {:.1f}'.format(time.monotonic() - t_start)
+                            cv2.putText(
+                            vis_img[i],
+                            text,
+                            (10,20),
+                            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale=0.5,
+                            thickness=1,
+                            color=(255,255,255)
+                            )
+                            
+                            cv2.imshow('default', vis_img[i][...,::-1])
+                            out.write(vis_img[i][..., ::-1])  # 写入视频，转换为 RGB 格式
+                            cv2.imwrite(f'default{i}.jpg', vis_img[i][...,::-1])  # 写入图片
+                        # write in a mp4 video
+                        
 
-
-                        # key_stroke = cv2.pollKey()
-                        # if key_stroke == ord('s'):
-                        #     # Stop episode
-                        #     # Hand control back to human
-                        #     env.end_episode()
-                        #     print('Stopped.')
-                        #     break
+                        key_stroke = cv2.pollKey()
+                        if key_stroke == ord('s'):
+                            # Stop episode
+                            # Hand control back to human
+                            # env.end_episode()
+                            
+                            # shut down the out video
+                            out.release()
+                            print('Stopped.')
+                            break
 
                         # # auto termination
                         # terminate = False
@@ -261,36 +309,20 @@ def main():
                         #     terminate = True
                         #     print('Terminated by the timeout!')
 
-                        # term_pose = np.array([ 3.40948500e-01,  2.17721816e-01,  4.59076878e-02,  2.22014183e+00, -2.22184883e+00, -4.07186655e-04])
-                        # curr_pose = obs['robot_eef_pose'][-1]
-                        # dist = np.linalg.norm((curr_pose - term_pose)[:2], axis=-1)
-                        # if dist < 0.03:
-                        #     # in termination area
-                        #     curr_timestamp = obs['timestamp'][-1]
-                        #     if term_area_start_timestamp > curr_timestamp:
-                        #         term_area_start_timestamp = curr_timestamp
-                        #     else:
-                        #         term_area_time = curr_timestamp - term_area_start_timestamp
-                        #         if term_area_time > 0.5:
-                        #             terminate = True
-                        #             print('Terminated by the policy!')
-                        # else:
-                        #     # out of the area
-                        #     term_area_start_timestamp = float('inf')
-
                         # if terminate:
-                        #     env.end_episode()
+                        #     # env.end_episode()
                         #     break
 
-                        # # wait for execution
+                        # wait for execution
                         # precise_wait(t_cycle_end - frame_latency)
                         # iter_idx += steps_per_inference
 
                 except KeyboardInterrupt:
                     print("Interrupted!")
                     # stop robot.
-                    env.end_episode()
-                
+                    # env.end_episode()
+                    env.close()
+                    exit(0)
                 print("Stopped.")
 
 
