@@ -88,11 +88,11 @@ policy:
   shape_meta:
     action:
       shape:
-      - 7
+      - 2
     obs:
       agent_pos:
         shape:
-        - 7
+        - 2
         type: low_dim
       fake_touch:
         shape:
@@ -107,11 +107,11 @@ policy:
 shape_meta:
   action:
     shape:
-    - 7
+    - 2
   obs:
     agent_pos:
       shape:
-      - 7
+      - 2
       type: low_dim
     fake_touch:
       shape:
@@ -134,20 +134,20 @@ task:
     val_ratio: 0.02
     zarr_path: /home/camille/IL/diffusion_policy/data/pusht/pusht_cchi_v7_replay.zarr
   env_runner:
-    _target_: diffusion_policy.env_runner.pusht_image_runner_1.PushTImageRunner
-    fps: 10
-    legacy_test: true
-    max_steps: 300
-    n_action_steps: 8
-    n_envs: null
-    n_obs_steps: 2
-    n_test: 50
-    n_test_vis: 4
-    n_train: 6
-    n_train_vis: 2
-    past_action: false
-    test_start_seed: 100000
-    train_start_seed: 0
+    _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner
+    # fps: 10
+    # legacy_test: true
+    # max_steps: 300
+    # n_action_steps: 8
+    # n_envs: null
+    # n_obs_steps: 2
+    # n_test: 50
+    # n_test_vis: 4
+    # n_train: 6
+    # n_train_vis: 2
+    # past_action: false
+    # test_start_seed: 100000
+    # train_start_seed: 0
   image_shape:
   - 3
   - 96
@@ -156,11 +156,11 @@ task:
   shape_meta:
     action:
       shape:
-      - 7
+      - 2
     obs:
       agent_pos:
         shape:
-        - 7
+        - 2
         type: low_dim
       fake_touch:
         shape:
