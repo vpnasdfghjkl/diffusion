@@ -46,8 +46,8 @@ from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.common.cv2_util import get_image_transform
 import rospy
 
-input="/app/data/outputs/2024.10.24/19.52.58_train_diffusion_unet_image_SongLingPickPlace_task/checkpoints/latest.ckpt"
-output="/app/data/outputs/2024.10.24/19.52.58_train_diffusion_unet_image_SongLingPickPlace_task/checkpoints/output"
+input="/app/action_state/latest.ckpt"
+output="/app/action_state/output"
 robot_ip="192.168.0.204"
 match_dataset="/app/data/SongLing/SongLingPickPlace.zarr"
 
@@ -225,7 +225,7 @@ def main():
 
                         # execute actions
                         env.exec_actions(
-                            actions=action,
+                            actions=action[:8],
                         )
                         print(f"Submitted {len(action)} steps of actions.")
 

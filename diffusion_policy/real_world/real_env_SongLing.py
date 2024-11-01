@@ -12,10 +12,10 @@ import time
 from tqdm import tqdm  
 import matplotlib.pyplot as plt
 import pathlib
-import keyboard
+# import keyboard
 DEFAULT_OBS_KEY_MAP = {
     "img":{
-        "img01": "/camera_f/color/image_raw",
+        "img01": "/camera/color/image_raw",
         "img02": "/camera_r/color/image_raw",
     },
     "low_dim":{
@@ -146,6 +146,7 @@ class SongLingActor:
     def publish_target_pose(self, pose: np.ndarray):
         msg = JointState()
         msg.position = pose.tolist()  # 假设你想要传递位置
+        msg.velocity = [0] * 7
         msg.header.stamp = rospy.Time.now()  # 添加时间戳
         msg.name = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "joint7"]  # 自定义关节名称
         self.target_pub.publish(msg)
@@ -208,6 +209,7 @@ class SongLingEnv:
         new_actions = actions
         for i in range(len(new_actions)):
             self.target_publisher.publish_target_pose(new_actions[i])
+            time.sleep(0.5)
     
     
     def close(self):
