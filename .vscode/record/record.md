@@ -14,4 +14,5 @@ echo '<launch>
 cd ~/hx/image_transport_ws
 catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 source devel/setup.zsh  # or source devel/setup.zsh
+roslaunch img_transport_pkg compress_images.launch
 ```

@@ -7,5 +7,5 @@ rosbag record -o SongLing_task2 \
              /puppet/joint_left \
              /puppet/joint_right \
              --bz2 \
-             --duration=3600 \
+             --duration=20 \
              --quiet
