@@ -38,10 +38,14 @@ from dynamic_biped.srv import controlEndHand, controlEndHandRequest
 # =============================================================================
 
 DEFAULT_OBS_KEY_MAP = {
-    "obs_img01": "/head_camera/color/image_raw/compressed",
-    "obs_state_hand": "/robot_hand_position",
-    "obs_cmd_eef_pose": "/drake_ik/cmd_arm_hand_pose",
-    "obs_state_eef_pose": "/drake_ik/real_arm_hand_pose",
+    "img":{
+        "img01": "/head_camera/color/image_raw/compressed",
+    },
+    "low_dim":{
+        "obs_state_eef_pose": "/drake_ik/real_arm_hand_pose",
+        "obs_state_hand": "/robot_hand_position",
+        "obs_cmd_eef_pose": "/drake_ik/cmd_arm_hand_pose",
+    },
 }
 
 DEFAULT_ACT_KEY_MAP = {
@@ -53,64 +57,25 @@ DEFAULT_ACT_KEY_MAP = {
 HAND_OPEN_STATE = "[0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"
 # GRIPPER_CLOSE_STATE = "[30, 30, 90, 90, 90, 90, 30, 30, 90, 90, 90, 90]"
 HAND_CLOSE_STATE = "[30, 30, 90, 90, 90, 90, 0, 0, 0, 0, 0, 0]"
-class FakeRobot:
-    def __init__(self):
-        # Initialize ROS node
-        rospy.init_node('fake_robot', anonymous=True)
 
-        # Publishers for the specified topics
-        self.obs_img01_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_img01"], CompressedImage, queue_size=10)
-        self.obs_state_hand_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_state_hand"], robotHandPosition, queue_size=10)
-        self.obs_state_eef_pose_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_state_eef_pose"], recordArmHandPose, queue_size=10)
-        self.obs_cmd_eef_pose_pub = rospy.Publisher(DEFAULT_OBS_KEY_MAP["obs_cmd_eef_pose"], recordArmHandPose, queue_size=10)
-
-    def publish_img01(self, image_msg):
-        self.obs_img01_pub.publish(image_msg)
-
-    def publish_state_hand(self, hand_position_msg):
-        self.obs_state_hand_pub.publish(hand_position_msg)
-
-    def publish_eef_pose(self, eef_pose_msg):
-        self.obs_state_eef_pose_pub.publish(eef_pose_msg)
-
-    def publish_cmd_eef_pose(self, cmd_eef_pose_msg):
-        self.obs_cmd_eef_pose_pub.publish(cmd_eef_pose_msg)
-
-    def run(self):
-        rate = rospy.Rate(100)  # Publish at 10 Hz
-        while not rospy.is_shutdown():
-            # Here you can create and publish messages
-            # For example:
-            image_msg = CompressedImage()  # Populate your image message here
-            self.publish_img01(image_msg)
-
-            hand_position_msg = robotHandPosition()  # Populate your hand position message here
-            self.publish_state_hand(hand_position_msg)
-
-            eef_pose_msg = recordArmHandPose()  # Populate your eef pose message here
-            self.publish_eef_pose(eef_pose_msg)
-
-            cmd_eef_pose_msg = recordArmHandPose()  # Populate your command eef pose message here
-            self.publish_cmd_eef_pose(cmd_eef_pose_msg)
-
-            rate.sleep()
     
 class ObsBuffer:
     def __init__(self, img_buffer_size: int = 30, robot_state_buffer_size: int = 120):
         self.img_buffer_size = img_buffer_size
         self.robot_state_buffer_size = robot_state_buffer_size
         self.obs_buffer_data = {key: {"data": deque(maxlen=img_buffer_size),"timestamp": deque(maxlen=img_buffer_size),} \
-                                for key in DEFAULT_OBS_KEY_MAP if "obs_img" in key}
+                                for key in self.obs_key_map["img"]}
         
         self.obs_buffer_data.update({key: {"data": deque(maxlen=robot_state_buffer_size),"timestamp": deque(maxlen=robot_state_buffer_size),} \
-                                    for key in DEFAULT_OBS_KEY_MAP if "obs_img" not in key})
+                                    for key in self.obs_key_map["low_dim"]})
      
         # Subscribe to the ROS topics
-        self.obs_img01_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_img01"],CompressedImage,lambda msg: self.image_callback(msg, "obs_img01"),)
-        self.obs_state_hand_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_hand"],robotHandPosition,lambda msg: self.left_control_hand(msg, "obs_state_hand"),)
+        self.img01_suber = rospy.Subscriber(self.obs_key_map["img"]["img01"],Image,lambda msg: self.image_callback(msg, "img01"),)
+        
+        self.obs_state_hand_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["low_dim"]["obs_state_hand"],robotHandPosition,lambda msg: self.left_control_hand(msg, "obs_state_hand"),)
 
-        self.obs_state_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_state_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_state_eef_pose"),)
-        self.obs_cmd_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["obs_cmd_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_cmd_eef_pose"),)
+        self.obs_state_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["low_dim"]["obs_state_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_state_eef_pose"),)
+        self.obs_cmd_eef_pose_suber = rospy.Subscriber(DEFAULT_OBS_KEY_MAP["low_dim"]["obs_cmd_eef_pose"],recordArmHandPose,lambda msg: self.eef_pose_callback(msg, "obs_cmd_eef_pose"),)
 
     def image_callback(self, msg: CompressedImage, key: str):
         np_arr = np.frombuffer(msg.data, np.uint8)
@@ -208,107 +173,32 @@ class TargetPublisher:
 
 
 class KuavoEnv:
-    def __init__(
-        self,
-        # required params
-        output_dir,
-        ROS_MASTER_URI="http://localhost:11311",
-        # env params
-        frequency=10,
-        n_obs_steps=2,
-        # obs
-        obs_image_resolution=(640, 480),
-        max_obs_buffer_size=30,
-        obs_topic_key_map=DEFAULT_OBS_KEY_MAP,
-        act_topic_key_map=DEFAULT_ACT_KEY_MAP,
-        hand_open_state=HAND_OPEN_STATE,
-        hand_close_state=HAND_CLOSE_STATE,
-        # camera_serial_numbers=None,
-        obs_key_map=DEFAULT_OBS_KEY_MAP,
-        obs_float32=False,
-        # action
-        # max_pos_speed=0.25,
-        # max_rot_speed=0.6,
-        # robot
-        robot_publish_rate=125,
-        # tcp_offset=0.13,
-        # init_joints=False,
-        # video capture params
-        video_capture_fps=30,
-        video_capture_resolution=(1280, 720),
-        # saving params
-        # record_raw_video=True,
-        # thread_per_video=2,
-        # video_crf=21,
-        # vis params
-        # enable_multi_cam_vis=True,
-        # multi_cam_vis_resolution=(1280,720),
-        # shared memory
-        # shm_manager=None
-    ):
+    def __init__(self,
+                frequency:int = 10, 
+                n_obs_steps:int = 2, 
+                video_capture_fps=30,
+                robot_publish_rate=100,
+                img_buffer_size = 30,
+                robot_state_buffer_size = 100,
+                obs_key_map: Optional[Dict[str, Dict[str, str]]] = None,
+                video_capture_resolution=(640, 480), # (W,H)
+                output_dir: str = "output",
+                ) -> None:
         assert frequency <= video_capture_fps
         output_dir = pathlib.Path(output_dir)
         assert output_dir.parent.is_dir()
 
-        video_dir = output_dir.joinpath("videos")
-        video_dir.mkdir(parents=True, exist_ok=True)
-
-        zarr_path = str(output_dir.joinpath("replay_buffer.zarr").absolute())
-
-        replay_buffer = ReplayBuffer.create_from_path(zarr_path=zarr_path, mode="a")
-
-        color_tf = get_image_transform(
-            input_res=video_capture_resolution,
-            output_res=obs_image_resolution,
-            # obs output rgb
-            bgr_to_rgb=True,
-        )
-        color_transform = color_tf
-
-        if obs_float32:
-            color_transform = lambda x: color_tf(x).astype(np.float32) / 255
-
-        def transform(data):
-            data["color"] = color_transform(data["color"])
-            return data
-
-        recording_transfrom = None
-        recording_fps = video_capture_fps
-        recording_pix_fmt = "bgr24"
-
-        self.obs_buffer = ObsBuffer(
-            img_buffer_size=max_obs_buffer_size,
-            robot_state_buffer_size=max_obs_buffer_size * math.ceil((robot_publish_rate / video_capture_fps)),
-        )
-        self.target_publisher = TargetPublisher()
-
-        self.robot_publish_rate = robot_publish_rate
-        self.video_capture_fps = video_capture_fps
         self.frequency = frequency
         self.n_obs_steps = n_obs_steps
-        self.max_obs_buffer_size = max_obs_buffer_size
-        # self.max_pos_speed = max_pos_speed
-        # self.max_rot_speed = max_rot_speed
+        self.video_capture_fps = video_capture_fps
+        self.robot_publish_rate = robot_publish_rate
+        self.img_buffer_size = img_buffer_size
+        self.robot_state_buffer_size = robot_state_buffer_size
+        self.video_capture_resolution = video_capture_resolution
+        self.obs_key_map = obs_key_map if obs_key_map is not None else DEFAULT_OBS_KEY_MAP
 
-        self.obs_topic_key_map = obs_topic_key_map
-        self.act_topic_key_map = act_topic_key_map
-        self.hand_open_state = hand_open_state
-        self.hand_close_state = hand_close_state
-        
-        self.obs_key_map = obs_key_map
+        self.target_publisher = TargetPublisher()
 
-        # recording
-        self.output_dir = output_dir
-        self.video_dir = video_dir
-        self.replay_buffer = replay_buffer
-        # temp memory buffers
-        self.last_realsense_data = None
-        # recording buffers
-        self.obs_accumulator = None
-        self.action_accumulator = None
-        self.stage_accumulator = None
-
-        self.start_time = None
 
     # ======== start-stop API =============
     @property
@@ -486,83 +376,3 @@ class KuavoEnv:
         # if self.stage_accumulator is not None:
         #     self.stage_accumulator.put(new_stages, new_timestamps)
 
-    # ========= recording API ===========
-    # recording API
-    def start_episode(self, start_time=None):
-        "Start recording and return first obs"
-        if start_time is None:
-            start_time = time.time()
-        self.start_time = start_time
-
-        assert self.is_ready
-
-        # prepare recording stuff
-        episode_id = self.replay_buffer.n_episodes
-        this_video_dir = self.video_dir.joinpath(str(episode_id))
-        this_video_dir.mkdir(parents=True, exist_ok=True)
-        n_cameras = self.realsense.n_cameras
-        video_paths = list()
-        for i in range(n_cameras):
-            video_paths.append(str(this_video_dir.joinpath(f"{i}.mp4").absolute()))
-
-        # start recording on realsense
-        self.realsense.restart_put(start_time=start_time)
-        self.realsense.start_recording(video_path=video_paths, start_time=start_time)
-
-        # create accumulators
-        self.obs_accumulator = TimestampObsAccumulator(
-            start_time=start_time, dt=1 / self.frequency
-        )
-        self.action_accumulator = TimestampActionAccumulator(
-            start_time=start_time, dt=1 / self.frequency
-        )
-        self.stage_accumulator = TimestampActionAccumulator(
-            start_time=start_time, dt=1 / self.frequency
-        )
-        print(f"Episode {episode_id} started!")
-
-    def end_episode(self):
-        "Stop recording"
-        assert self.is_ready
-
-        # stop video recorder
-        self.realsense.stop_recording()
-
-        if self.obs_accumulator is not None:
-            # recording
-            assert self.action_accumulator is not None
-            assert self.stage_accumulator is not None
-
-            # Since the only way to accumulate obs and action is by calling
-            # get_obs and exec_actions, which will be in the same thread.
-            # We don't need to worry new data come in here.
-            obs_data = self.obs_accumulator.data
-            obs_timestamps = self.obs_accumulator.timestamps
-
-            actions = self.action_accumulator.actions
-            action_timestamps = self.action_accumulator.timestamps
-            stages = self.stage_accumulator.actions
-            n_steps = min(len(obs_timestamps), len(action_timestamps))
-            if n_steps > 0:
-                episode = dict()
-                episode["timestamp"] = obs_timestamps[:n_steps]
-                episode["action"] = actions[:n_steps]
-                episode["stage"] = stages[:n_steps]
-                for key, value in obs_data.items():
-                    episode[key] = value[:n_steps]
-                self.replay_buffer.add_episode(episode, compressors="disk")
-                episode_id = self.replay_buffer.n_episodes - 1
-                print(f"Episode {episode_id} saved!")
-
-            self.obs_accumulator = None
-            self.action_accumulator = None
-            self.stage_accumulator = None
-
-    def drop_episode(self):
-        self.end_episode()
-        self.replay_buffer.drop_episode()
-        episode_id = self.replay_buffer.n_episodes
-        this_video_dir = self.video_dir.joinpath(str(episode_id))
-        if this_video_dir.exists():
-            shutil.rmtree(str(this_video_dir))
-        print(f"Episode {episode_id} dropped!")
