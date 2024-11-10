@@ -4,6 +4,7 @@ import numpy as np
 import time
 import shutil
 import math
+from sensor_msgs.msg import Image, JointState
 from multiprocessing.managers import SharedMemoryManager
 # from diffusion_policy.real_world.rtde_interpolation_controller import (
 #     RTDEInterpolationController,
