@@ -5,21 +5,10 @@ import time
 import shutil
 import math
 from sensor_msgs.msg import Image, JointState
-from multiprocessing.managers import SharedMemoryManager
-# from diffusion_policy.real_world.rtde_interpolation_controller import (
-#     RTDEInterpolationController,
-# )
-# from diffusion_policy.real_world.multi_realsense import MultiRealsense, SingleRealsense
-from diffusion_policy.real_world.video_recorder import VideoRecorder
-from diffusion_policy.common.timestamp_accumulator import (
-    TimestampObsAccumulator,
-    TimestampActionAccumulator,
-    align_timestamps,
-)
+
 # from diffusion_policy.real_world.multi_camera_visualizer import MultiCameraVisualizer
 from diffusion_policy.common.replay_buffer import ReplayBuffer
 from diffusion_policy.common.cv2_util import get_image_transform, optimal_row_cols
-
 
 # =============================================================================
 import rospy
@@ -143,7 +132,10 @@ class ObsBuffer:
         
     def joint_callback(self, msg: JointState, key: str):
         # Float64Array ()
-        joint = (msg.position)[:7]
+        joint = (msg.position)
+        if key == "cmd_joint":
+            # convert from degree to rad
+            joint = [i * math.pi / 180 for i in joint]
         self.obs_buffer_data[key]["data"].append(joint)
         self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
     
@@ -156,7 +148,6 @@ class ObsBuffer:
     def robot_hand_eff_callback(self, msg: robot_hand_eff, key: str):
         # Float32Array (12)
         joint = msg.data
-        print("eef",type(joint[0]))
         self.obs_buffer_data[key]["data"].append(joint)
         self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
     
@@ -164,7 +155,6 @@ class ObsBuffer:
         # Uint8Array (6) + Uint8Array (6)
         joint = msg.left_hand_position + msg.right_hand_position
         joint= [float(i) for i in joint]
-        print("state",type(joint[0]))
         self.obs_buffer_data[key]["data"].append(joint)
         self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
             
@@ -204,6 +194,16 @@ class ObsBuffer:
             suber.unregister()
 
     def get_lastest_k_img(self, k: int) -> Dict[int, Dict[str, np.ndarray]]:
+        """
+        Return order T,H,W,C
+        {
+            0: {
+                'color': (T,H,W,C),
+                'timestamp': (T,)
+            },
+            1: ...
+        }
+        """
         out = {}
         for i, key in enumerate(self.obs_key_map["img"]):
             out[i] = {
@@ -213,6 +213,16 @@ class ObsBuffer:
         return out
 
     def get_latest_k_robotstate(self, k: int) -> dict:
+        """
+        Return order T,D
+        {
+            0: {
+                'data': (T,D),
+                'robot_receive_timestamp': (T,)
+            },
+            1: ...
+        }
+        """
         out = {}
         for i, key in enumerate(self.obs_key_map["low_dim"]):
             out[key] = {
@@ -387,31 +397,8 @@ class KuavoEnv:
         # get data
         # 30 Hz, camera_receive_timestamp
         k_image = math.ceil(self.n_obs_steps * (self.video_capture_fps / self.frequency))
-
-        """
-        Return order T,H,W,C
-        {
-            0: {
-                'color': (T,H,W,C),
-                'timestamp': (T,)
-            },
-            1: ...
-        }
-        """
         self.last_realsense_data = self.obs_buffer.get_lastest_k_img(k_image)
         
-        
-        
-        """
-        Return order T,D
-        {
-            0: {
-                'data': (T,D),
-                'robot_receive_timestamp': (T,)
-            },
-            1: ...
-        }
-        """
         k_robot = math.ceil(self.n_obs_steps * (self.robot_publish_rate / self.frequency))
         last_robot_data = self.obs_buffer.get_latest_k_robotstate(k_robot)
         # both have more than n_obs_steps data
@@ -456,13 +443,20 @@ class KuavoEnv:
                 robot_obs[f"ROBOT_{robot_state_name}"] = robot_state_data['data'][this_idxs]
                 robot_obs_timestamps[f"ROBOT_{robot_state_name}"] = this_timestamps[this_idxs]
 
-
-        # return obs
+    
+    
+        # ==========================================
+        # process raw data to standard obs
+        # ==========================================
         obs_data = dict(camera_obs)
         
-        print(robot_obs["ROBOT_state_gripper"].shape)
+        robot_obs["ROBOT_state_gripper"] = np.array([[0] if gripper_state[0] == 0 else [1] for gripper_state in robot_obs["ROBOT_state_gripper"]])
+
+        robot_obs["ROBOT_cmd_gripper"] = np.array([[0] if gripper_cmd[0] == 0 else [1] for gripper_cmd in robot_obs["ROBOT_state_gripper"]])
+        
         robot_final_obs = dict()
-        robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_state_joint"], robot_obs["ROBOT_state_gripper"]), axis=1)
+        robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_state_joint"][:,:7], robot_obs["ROBOT_state_gripper"]), axis=-1)
+        robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_cmd_eef"][:,:6], robot_obs["ROBOT_state_gripper"]), axis=-1)
    
         obs_data.update(robot_final_obs)
         obs_data["timestamp"] = obs_align_timestamps
@@ -501,17 +495,100 @@ class KuavoEnv:
         #     self.action_accumulator.put(new_actions, new_timestamps)
         # if self.stage_accumulator is not None:
         #     self.stage_accumulator.put(new_stages, new_timestamps)
+    
+    def check_timestamps_diff(self, check_steps=50):
+        all_delta_cam0101_cam0201 = []
+        all_delta_cam0102_cam0202 = []
+        all_delta_cam0101_cam0102 = []
+        all_delta_cam0201_cam0202 = []
+        
+        all_delta_cam0101_rob0101 = []
+        all_delta_cam0102_rob0102 = []
+        all_delta_rob0101_rob0102 = []
+        
+        img_topic = "img01"
+        robot_topic = "ROBOT_state_eef"
+        for _ in range(check_steps):
+            obs_data, camera_obs, camera_obs_timestamps, robot_obs, robot_obs_timestamps = env.get_obs()
+            
+            # should dt(1/frequency) diff
+            delta_cam0101_cam0102 = abs(camera_obs_timestamps[img_topic][0] - camera_obs_timestamps[img_topic][1])
+            # delta_cam0201_cam0202 = abs(camera_obs_timestamps["img02"][0] - camera_obs_timestamps["img02"][1])
+            delta_rob0101_rob0102 = abs(robot_obs_timestamps[robot_topic][0] - robot_obs_timestamps[robot_topic][1])
+            all_delta_cam0101_cam0102.append(delta_cam0101_cam0102)
+            # all_delta_cam0201_cam0202.append(delta_cam0201_cam0202)
+            all_delta_rob0101_rob0102.append(delta_rob0101_rob0102)
+            
+            # should 0 diff
+            # delta_cam0101_cam0201 = abs(camera_obs_timestamps["img01"][0] - camera_obs_timestamps["img02"][0])
+            # delta_cam0102_cam0202= abs(camera_obs_timestamps["img01"][1] - camera_obs_timestamps["img02"][1])
+            delta_cam0101_rob0101 = abs(camera_obs_timestamps[img_topic][0] - robot_obs_timestamps[robot_topic][0])
+            delta_cam0102_rob0102 = abs(camera_obs_timestamps[img_topic][1] - robot_obs_timestamps[robot_topic][1])
+            # all_delta_cam0101_cam0201.append(delta_cam0101_cam0201)
+            # all_delta_cam0102_cam0202.append(delta_cam0102_cam0202)
+            all_delta_cam0101_rob0101.append(delta_cam0101_rob0101)
+            all_delta_cam0102_rob0102.append(delta_cam0102_rob0102)
+            
+            time.sleep(0.1)
 
+            
+        # plot the diff between the timestamps
+        
+        import matplotlib.pyplot as plt
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 12))
 
+        # 在第一个子图上绘制前四个差值
+        # ax1.plot(all_delta_cam0101_cam0201, label="all_delta_cam0101_cam0201")  # 0
+        # ax1.plot(all_delta_cam0102_cam0202, label="all_delta_cam0102_cam0202")  # 0
+        ax1.plot(all_delta_cam0102_rob0102, label="all_delta_cam0102_rob0102")  # 0
+        ax1.plot(all_delta_cam0101_rob0101, label="all_delta_cam0101_rob0101")  # 0
+        ax1.set_title("should 0 Differences")  # 设置标题
+        ax1.legend()  # 显示图例
+
+        # 在第二个子图上绘制后三个差值
+        ax2.plot(all_delta_rob0101_rob0102, label="all_delta_rob0101_rob0102")  # 0.1
+        ax2.plot(all_delta_cam0101_cam0102, label="all_delta_cam0101_cam0102")  # 0.1
+        # ax2.plot(all_delta_cam0201_cam0202, label="all_delta_cam0201_cam0202")  # 0.1
+        ax2.set_title("should 0.1 Differences")  # 设置标题
+        ax2.legend()  # 显示图例
+
+        # 保存图像
+        # fig.savefig("min_agrmin_fu2.png")
+        fig.savefig("min_agrmin.png")   # good
+        # fig.savefig("max_agrmin.png")
+        # fig.savefig("max_before.png")
+        
+        # # show 
+        # plt.show()
+        
+        print(obs_data.keys())
+    
+    def check_data_accuracy(self, check_steps=50):
+        robot_cmd = []
+        for _ in range(check_steps):
+            obs_data, camera_obs, camera_obs_timestamps, robot_obs, robot_obs_timestamps = env.get_obs()
+            time.sleep(0.1)
+            robot_cmd.append(obs_data["state"][0])
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1, len(robot_cmd[0]), figsize=(24, 12))
+        robot_cmd = np.array(robot_cmd)
+        for i in range(len(robot_cmd[0])):
+            ax[i].plot(robot_cmd[:, i])
+            ax[i].set_title(f"cmd_{i}")
+        plt.show()
+        plt.savefig("cmd.png")
+        
+        
                     
 if __name__ == "__main__":
     rospy.init_node("test")
-    env = KuavoEnv(img_buffer_size=10, robot_state_buffer_size=10)
+    env = KuavoEnv(img_buffer_size=30, robot_state_buffer_size=100)
     print("waiting for the obs buffer to be ready ......")
     env.obs_buffer.wait_buffer_ready()
-    # env.check_timestamps_diff(check_steps=50)
+    # env.check_timestamps_diff(check_steps=100)
+    env.check_data_accuracy(check_steps=50)
     # env.save_img_video(check_steps=20)
-    running = True
+    running = False
 
     while True:
         # command = input("Enter command (s: start, p: pause, q: exit): ")
@@ -529,4 +606,5 @@ if __name__ == "__main__":
             cur_obs, _, _, _, _ = env.get_obs()
             action = cur_obs["agent_pos"]
             env.exec_actions(actions=action)
-    env.close()
+        else:
+            break
