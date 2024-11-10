@@ -186,8 +186,8 @@ class ObsBuffer:
     
     
     def obs_buffer_is_ready(self):
-        return all([len(self.obs_buffer_data[key]["data"]) == self.img_buffer_size for key in DEFAULT_OBS_KEY_MAP["img"]]) and \
-               all([len(self.obs_buffer_data[key]["data"]) == self.robot_state_buffer_size for key in DEFAULT_OBS_KEY_MAP["low_dim"]])
+        return all([len(self.obs_buffer_data[key]["data"]) == self.img_buffer_size for key in DEFAULT_OBS_KEY_MAP["img"] if "state" in key]) and \
+               all([len(self.obs_buffer_data[key]["data"]) == self.robot_state_buffer_size for key in DEFAULT_OBS_KEY_MAP["low_dim"] if "state" in key])
 
     def stop_subscribers(self):
         for key, suber in self.suber_dict.items():
