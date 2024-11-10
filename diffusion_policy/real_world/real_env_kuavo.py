@@ -70,7 +70,7 @@ DEFAULT_OBS_KEY_MAP = {
             "msg_type":robot_hand_eff,
             },
         "state_gripper": {
-            "topic":"/robot_arm_q_v_tau",
+            "topic":"/robot_hand_position",
             "msg_type":robotHandPosition,
             },
     },
@@ -99,100 +99,103 @@ class ObsBuffer:
         
         self.obs_buffer_data.update({key: {"data": deque(maxlen=robot_state_buffer_size),"timestamp": deque(maxlen=robot_state_buffer_size),} \
                                     for key in self.obs_key_map["low_dim"]})
-     
-        # Subscribe to the ROS topics
-        
-        
-        
-        def setup_subscribers(obs_key_map, callback_key_map):
-            for obs_cls, topics in obs_key_map.items():
-                for topic_key, topic_info in topics.items():
-                    topic_name = topic_info["topic"]
-                    msg_type = topic_info["msg_type"]
-
-                    callback = callback_key_map.get(msg_type)
-                    if callback:
-                        self.suber_dict[topic_key] = rospy.Subscriber(topic_name, msg_type, lambda msg, key=topic_key: callback(msg, key))
-                        print(f"Subscribed to {topic_name} with callback {callback.__name__}")
-                    else:
-                        print(f"No callback found for message type {msg_type}")
-        
-        def compressedImage_callback(self, msg: CompressedImage, key: str):
-            np_arr = np.frombuffer(msg.data, np.uint8)
-            cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            resized_img = cv2.resize(cv_img, (256, 256))
-
-            self.obs_buffer_data[key]["data"].append(resized_img)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-
-        # def left_control_hand(self, msg: robotHandPosition, key: str):
-        #     left_hand_pose = msg.left_hand_position
-        #     if left_hand_pose[-1] == 0:
-        #         grip = 0
-        #     elif left_hand_pose[-1] == 90:
-        #         grip = 1
-        #     else:
-        #         print("hand pose error")
-        #     self.obs_buffer_data[key]["data"].append(grip)
-        #     self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-
-        def recordArmHandPose_callback(self, msg: recordArmHandPose, key: str):
-            # Float64Array ()
-            xyz = np.array(msg.left_pose.pos_xyz)
-            xyzw = np.array(msg.left_pose.quat_xyzw)
-            rotation = R.from_quat(xyzw)
-            euler_angles = rotation.as_euler("xyz")
-            xyzrpy = np.concatenate((xyz, euler_angles))
-
-            self.obs_buffer_data[key]["data"].append(xyzrpy)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-            
-        def joint_callback(self, msg: JointState, key: str):
-            # Float64Array ()
-            joint = (msg.position)[:7]
-            self.obs_buffer_data[key]["data"].append(joint)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-        
-        def robotArmInfo_callback(self, msg: robotArmInfo, key: str):
-            # Float64Array ()
-            joint = msg.q
-            self.obs_buffer_data[key]["data"].append(joint)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-        
-        def robot_hand_eff_callback(self, msg: robot_hand_eff, key: str):
-            # Float32Array (12)
-            joint = msg.data
-            self.obs_buffer_data[key]["data"].append(joint)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-        
-        def robotHandPosition_callback(self, msg: robotHandPosition, key: str):
-            # Uint8Array (6) + Uint8Array (6)
-            joint = msg.left_hand_position + msg.right_hand_position
-            self.obs_buffer_data[key]["data"].append(joint)
-            self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
-            
-        self.suber_dict = {}
-        
-        DEFAULT_CALLBACK_KEY_MAP = {
-            CompressedImage: compressedImage_callback,
-            recordArmHandPose: recordArmHandPose_callback,
-            JointState: joint_callback,
-            robotArmInfo: robotArmInfo_callback,
-            robot_hand_eff: robot_hand_eff_callback,
-            robotHandPosition: robotHandPosition_callback
+       
+        self.callback_key_map = {
+            CompressedImage: self.compressedImage_callback,
+            recordArmHandPose: self.recordArmHandPose_callback,
+            JointState: self.joint_callback,
+            robotArmInfo: self.robotArmInfo_callback,
+            robot_hand_eff: self.robot_hand_eff_callback,
+            robotHandPosition: self.robotHandPosition_callback
         }
-        self.callback_key_map = DEFAULT_CALLBACK_KEY_MAP
-        setup_subscribers(self.obs_key_map, self.callback_key_map)
+
+        self.suber_dict = {}
+
+        self.setup_subscribers()
     
     
+    # Subscribe to the ROS topics
+    def compressedImage_callback(self, msg: CompressedImage, key: str):
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        resized_img = cv2.resize(cv_img, (256, 256))
+        self.obs_buffer_data[key]["data"].append(resized_img)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+    # def left_control_hand(self, msg: robotHandPosition, key: str):
+    #     left_hand_pose = msg.left_hand_position
+    #     if left_hand_pose[-1] == 0:
+    #         grip = 0
+    #     elif left_hand_pose[-1] == 90:
+    #         grip = 1
+    #     else:
+    #         print("hand pose error")
+    #     self.obs_buffer_data[key]["data"].append(grip)
+    #     self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+    def recordArmHandPose_callback(self, msg: recordArmHandPose, key: str):
+        # Float64Array ()
+        xyz = np.array(msg.left_pose.pos_xyz)
+        xyzw = np.array(msg.left_pose.quat_xyzw)
+        rotation = R.from_quat(xyzw)
+        euler_angles = rotation.as_euler("xyz")
+        xyzrpy = np.concatenate((xyz, euler_angles))
+        self.obs_buffer_data[key]["data"].append(xyzrpy)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+        
+    def joint_callback(self, msg: JointState, key: str):
+        # Float64Array ()
+        joint = (msg.position)[:7]
+        self.obs_buffer_data[key]["data"].append(joint)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+    
+    def robotArmInfo_callback(self, msg: robotArmInfo, key: str):
+        # Float64Array ()
+        joint = msg.q
+        self.obs_buffer_data[key]["data"].append(joint)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+    
+    def robot_hand_eff_callback(self, msg: robot_hand_eff, key: str):
+        # Float32Array (12)
+        joint = msg.data
+        print("eef",type(joint[0]))
+        self.obs_buffer_data[key]["data"].append(joint)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+    
+    def robotHandPosition_callback(self, msg: robotHandPosition, key: str):
+        # Uint8Array (6) + Uint8Array (6)
+        joint = msg.left_hand_position + msg.right_hand_position
+        joint= [float(i) for i in joint]
+        print("state",type(joint[0]))
+        self.obs_buffer_data[key]["data"].append(joint)
+        self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
+            
+        
+        
+        
+    def create_callback(self, callback, topic_key):
+        return lambda msg: callback(msg, topic_key)
+    
+    
+    def setup_subscribers(self):
+        for obs_cls, topics in self.obs_key_map.items():
+            for topic_key, topic_info in topics.items():
+                topic_name = topic_info["topic"]
+                msg_type = topic_info["msg_type"]
+
+                callback = self.callback_key_map.get(msg_type)
+                if callback:
+                    self.suber_dict[topic_key] = rospy.Subscriber(
+                        topic_name, msg_type, self.create_callback(callback, topic_key)
+                    )
+                    print(f"Subscribed to {topic_name} with callback {callback.__name__}")
+                else:
+                    print(f"No callback found for message type {msg_type}")
+
+        
+
     
     
     
     def obs_buffer_is_ready(self):
-        # print(len(self.obs_buffer_data["obs_img01"]["data"]))
-        # print(len(self.obs_buffer_data["state_gripper"]["data"]))
-        # print(len(self.obs_buffer_data["state_eef"]["data"]))
-        # print(len(self.obs_buffer_data["cmd_eef"]["timestamp"]))
         return all([len(self.obs_buffer_data[key]["data"]) == self.img_buffer_size for key in DEFAULT_OBS_KEY_MAP["img"]]) and \
                all([len(self.obs_buffer_data[key]["data"]) == self.robot_state_buffer_size for key in DEFAULT_OBS_KEY_MAP["low_dim"]])
 
@@ -457,6 +460,7 @@ class KuavoEnv:
         # return obs
         obs_data = dict(camera_obs)
         
+        print(robot_obs["ROBOT_state_gripper"].shape)
         robot_final_obs = dict()
         robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_state_joint"], robot_obs["ROBOT_state_gripper"]), axis=1)
    
@@ -502,7 +506,7 @@ class KuavoEnv:
                     
 if __name__ == "__main__":
     rospy.init_node("test")
-    env = KuavoEnv(img_buffer_size=30, robot_state_buffer_size=100)
+    env = KuavoEnv(img_buffer_size=10, robot_state_buffer_size=10)
     print("waiting for the obs buffer to be ready ......")
     env.obs_buffer.wait_buffer_ready()
     # env.check_timestamps_diff(check_steps=50)
