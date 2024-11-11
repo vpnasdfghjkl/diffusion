@@ -23,7 +23,7 @@ from tqdm import tqdm
 
 
 from dynamic_biped.msg import robotArmInfo, recordArmHandPose, robotHandPosition, robot_hand_eff
-from dynamic_biped.srv import controlEndHand, controlEndHandRequest
+from dynamic_biped.srv import controlEndHand, controlEndHandRequest, controlEndHandResponse
 
 
 # =============================================================================
@@ -306,7 +306,9 @@ class TargetPublisher:
         except rospy.ROSException as e:
             rospy.logerr("Service call failed: %s" % e)
             return False
-
+        except KeyboardInterrupt:
+            rospy.loginfo("Service call interrupted, shutting down.")
+            return False
 
 class KuavoEnv:
     def __init__(self,
@@ -332,10 +334,10 @@ class KuavoEnv:
         self.robot_state_buffer_size = robot_state_buffer_size
         self.video_capture_resolution = video_capture_resolution
         self.obs_key_map = obs_key_map if obs_key_map is not None else DEFAULT_OBS_KEY_MAP
+        self.hand_close_state, self.hand_open_state = HAND_CLOSE_STATE, HAND_OPEN_STATE
 
         self.obs_buffer = ObsBuffer(img_buffer_size=self.img_buffer_size, robot_state_buffer_size=self.robot_state_buffer_size, obs_key_map=self.obs_key_map)
         self.target_publisher = TargetPublisher()
-
 
     # ======== start-stop API =============
     @property
@@ -456,7 +458,7 @@ class KuavoEnv:
         
         robot_final_obs = dict()
         robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_state_joint"][:,:7], robot_obs["ROBOT_state_gripper"]), axis=-1)
-        robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_cmd_eef"][:,:6], robot_obs["ROBOT_state_gripper"]), axis=-1)
+        # robot_final_obs["state"] = np.concatenate((robot_obs["ROBOT_cmd_eef"][:,:6], robot_obs["ROBOT_state_gripper"]), axis=-1)
    
         obs_data.update(robot_final_obs)
         obs_data["timestamp"] = obs_align_timestamps
@@ -481,8 +483,6 @@ class KuavoEnv:
 
         # convert action to pose
         new_actions = actions
-        self.target_publisher.publish_target_pose(new_actions)
-        # schedule waypoints
         for i in range(len(new_actions)):
             self.target_publisher.publish_target_pose(new_actions[i, :6])
             if new_actions[i, -1] > 0.5:
@@ -581,30 +581,48 @@ class KuavoEnv:
         
                     
 if __name__ == "__main__":
-    rospy.init_node("test")
-    env = KuavoEnv(img_buffer_size=30, robot_state_buffer_size=100)
-    print("waiting for the obs buffer to be ready ......")
-    env.obs_buffer.wait_buffer_ready()
-    # env.check_timestamps_diff(check_steps=100)
-    env.check_data_accuracy(check_steps=50)
-    # env.save_img_video(check_steps=20)
-    running = False
+    try:
 
-    while True:
-        # command = input("Enter command (s: start, p: pause, q: exit): ")
-        # if command == 's':
-        #     running = True
-        #     print("Started!")
-        # elif command == 'p':
-        #     running = False
-        #     print("Paused!")
-        # elif command == 'q':
-        #     print("Exiting...")
-        #     break
+        rospy.init_node("test")
+        def handle_control_end_hand(req):
+            recv_hand_pose = req.left_hand_position + req.right_hand_position
+            recv_hand_pose = [float(i) for i in recv_hand_pose]
+            rospy.loginfo("Received hand_position: %s", recv_hand_pose)   
+            success = True
+            return controlEndHandResponse(result=success)
+        rospy.Service('/control_end_hand', controlEndHand, handle_control_end_hand)
+        
+        
+        env = KuavoEnv(img_buffer_size=30, robot_state_buffer_size=100)
+        print("waiting for the obs buffer to be ready ......")
+        env.obs_buffer.wait_buffer_ready()
+        # env.check_timestamps_diff(check_steps=100)
+        # env.check_data_accuracy(check_steps=50)
+        # env.save_img_video(check_steps=20)
+        running = True
 
-        if running:
-            cur_obs, _, _, _, _ = env.get_obs()
-            action = cur_obs["agent_pos"]
-            env.exec_actions(actions=action)
-        else:
-            break
+        while True:
+            # command = input("Enter command (s: start, p: pause, q: exit): ")
+            # if command == 's':
+            #     running = True
+            #     print("Started!")
+            # elif command == 'p':
+            #     running = False
+            #     print("Paused!")
+            # elif command == 'q':
+            #     print("Exiting...")
+            #     break
+
+            if running:
+                cur_obs, _, _, _, _ = env.get_obs()
+                print(cur_obs.keys())
+                print(cur_obs["state"])
+                action = cur_obs["state"]
+                env.exec_actions(actions=action)
+                time.sleep(2)
+            else:
+                break
+    except KeyboardInterrupt:
+        rospy.loginfo("Shutting down node...")
+        rospy.signal_shutdown("Manual shutdown")
+        
