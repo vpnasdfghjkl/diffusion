@@ -180,10 +180,6 @@ class ObsBuffer:
                 else:
                     print(f"No callback found for message type {msg_type}")
 
-        
-
-    
-    
     
     def obs_buffer_is_ready(self):
         return all([len(self.obs_buffer_data[key]["data"]) == self.img_buffer_size for key in DEFAULT_OBS_KEY_MAP["img"] if "state" in key]) and \
@@ -346,27 +342,9 @@ class KuavoEnv:
 
     def start(self, wait=True):
         print(self.is_ready)
-        # self.realsense.start(wait=False)
-        # self.robot.start(wait=False)
-        # if self.multi_cam_vis is not None:
-        #     self.multi_cam_vis.start(wait=False)
-        # if wait:
-        #     self.start_wait()
 
     def stop(self):
         self.obs_buffer.stop_subscribers()
-
-    # def start_wait(self):
-    #     self.realsense.start_wait()
-    #     self.robot.start_wait()
-    #     if self.multi_cam_vis is not None:
-    #         self.multi_cam_vis.start_wait()
-
-    # def stop_wait(self):
-    #     self.robot.stop_wait()
-    #     self.realsense.stop_wait()
-    #     if self.multi_cam_vis is not None:
-    #         self.multi_cam_vis.stop_wait()
 
     # ========= context manager ===========
     def __enter__(self):
