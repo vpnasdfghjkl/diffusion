@@ -65,4 +65,4 @@ class HandSrvToTopic:
 
 if __name__ == '__main__':
     nod = HandSrvToTopic()
-    HandSrvToTopic()
+    # HandSrvToTopic()

@@ -23,7 +23,6 @@ class robotArmQVVD {
       this.q = null;
       this.v = null;
       this.vd = null;
-      this.tau = null;
     }
     else {
       if (initObj.hasOwnProperty('header')) {
@@ -50,12 +49,6 @@ class robotArmQVVD {
       else {
         this.vd = [];
       }
-      if (initObj.hasOwnProperty('tau')) {
-        this.tau = initObj.tau
-      }
-      else {
-        this.tau = [];
-      }
     }
   }
 
@@ -69,8 +62,6 @@ class robotArmQVVD {
     bufferOffset = _arraySerializer.float64(obj.v, buffer, bufferOffset, null);
     // Serialize message field [vd]
     bufferOffset = _arraySerializer.float64(obj.vd, buffer, bufferOffset, null);
-    // Serialize message field [tau]
-    bufferOffset = _arraySerializer.float64(obj.tau, buffer, bufferOffset, null);
     return bufferOffset;
   }
 
@@ -86,8 +77,6 @@ class robotArmQVVD {
     data.v = _arrayDeserializer.float64(buffer, bufferOffset, null)
     // Deserialize message field [vd]
     data.vd = _arrayDeserializer.float64(buffer, bufferOffset, null)
-    // Deserialize message field [tau]
-    data.tau = _arrayDeserializer.float64(buffer, bufferOffset, null)
     return data;
   }
 
@@ -97,8 +86,7 @@ class robotArmQVVD {
     length += 8 * object.q.length;
     length += 8 * object.v.length;
     length += 8 * object.vd.length;
-    length += 8 * object.tau.length;
-    return length + 16;
+    return length + 12;
   }
 
   static datatype() {
@@ -108,7 +96,7 @@ class robotArmQVVD {
 
   static md5sum() {
     //Returns md5sum for a message object
-    return '3871141b674f003bc326e4d8da08f4ad';
+    return 'a7be9f5331e9207427b0c5c8ace7b977';
   }
 
   static messageDefinition() {
@@ -118,7 +106,6 @@ class robotArmQVVD {
     float64[] q
     float64[] v
     float64[] vd
-    float64[] tau
     ================================================================================
     MSG: std_msgs/Header
     # Standard metadata for higher-level stamped data types.
@@ -170,13 +157,6 @@ class robotArmQVVD {
     }
     else {
       resolved.vd = []
-    }
-
-    if (msg.tau !== undefined) {
-      resolved.tau = msg.tau;
-    }
-    else {
-      resolved.tau = []
     }
 
     return resolved;

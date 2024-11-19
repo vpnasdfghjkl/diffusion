@@ -7,6 +7,4 @@
           V
           VD-VAL
           VD
-          TAU-VAL
-          TAU
 ))

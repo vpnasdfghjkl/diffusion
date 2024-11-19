@@ -16,7 +16,7 @@
 
 (defclass dynamic_biped::robotArmQVVD
   :super ros::object
-  :slots (_header _q _v _vd _tau ))
+  :slots (_header _q _v _vd ))
 
 (defmethod dynamic_biped::robotArmQVVD
   (:init
@@ -25,14 +25,12 @@
     ((:q __q) (make-array 0 :initial-element 0.0 :element-type :float))
     ((:v __v) (make-array 0 :initial-element 0.0 :element-type :float))
     ((:vd __vd) (make-array 0 :initial-element 0.0 :element-type :float))
-    ((:tau __tau) (make-array 0 :initial-element 0.0 :element-type :float))
     )
    (send-super :init)
    (setq _header __header)
    (setq _q __q)
    (setq _v __v)
    (setq _vd __vd)
-   (setq _tau __tau)
    self)
   (:header
    (&rest __header)
@@ -50,9 +48,6 @@
   (:vd
    (&optional __vd)
    (if __vd (setq _vd __vd)) _vd)
-  (:tau
-   (&optional __tau)
-   (if __tau (setq _tau __tau)) _tau)
   (:serialization-length
    ()
    (+
@@ -64,8 +59,6 @@
     (* 8    (length _v)) 4
     ;; float64[] _vd
     (* 8    (length _vd)) 4
-    ;; float64[] _tau
-    (* 8    (length _tau)) 4
     ))
   (:serialize
    (&optional strm)
@@ -87,11 +80,6 @@
      (write-long (length _vd) s)
      (dotimes (i (length _vd))
        (sys::poke (elt _vd i) (send s :buffer) (send s :count) :double) (incf (stream-count s) 8)
-       )
-     ;; float64[] _tau
-     (write-long (length _tau) s)
-     (dotimes (i (length _tau))
-       (sys::poke (elt _tau i) (send s :buffer) (send s :count) :double) (incf (stream-count s) 8)
        )
      ;;
      (if (null strm) (get-output-stream-string s))))
@@ -120,25 +108,17 @@
      (dotimes (i n)
      (setf (elt _vd i) (sys::peek buf ptr- :double)) (incf ptr- 8)
      ))
-   ;; float64[] _tau
-   (let (n)
-     (setq n (sys::peek buf ptr- :integer)) (incf ptr- 4)
-     (setq _tau (instantiate float-vector n))
-     (dotimes (i n)
-     (setf (elt _tau i) (sys::peek buf ptr- :double)) (incf ptr- 8)
-     ))
    ;;
    self)
   )
 
-(setf (get dynamic_biped::robotArmQVVD :md5sum-) "3871141b674f003bc326e4d8da08f4ad")
+(setf (get dynamic_biped::robotArmQVVD :md5sum-) "a7be9f5331e9207427b0c5c8ace7b977")
 (setf (get dynamic_biped::robotArmQVVD :datatype-) "dynamic_biped/robotArmQVVD")
 (setf (get dynamic_biped::robotArmQVVD :definition-)
       "Header header
 float64[] q
 float64[] v
 float64[] vd
-float64[] tau
 ================================================================================
 MSG: std_msgs/Header
 # Standard metadata for higher-level stamped data types.
@@ -159,6 +139,6 @@ string frame_id
 
 
 
-(provide :dynamic_biped/robotArmQVVD "3871141b674f003bc326e4d8da08f4ad")
+(provide :dynamic_biped/robotArmQVVD "a7be9f5331e9207427b0c5c8ace7b977")
 
 

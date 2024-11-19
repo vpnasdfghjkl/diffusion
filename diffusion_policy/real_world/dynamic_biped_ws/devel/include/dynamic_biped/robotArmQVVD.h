@@ -28,15 +28,13 @@ struct robotArmQVVD_
     : header()
     , q()
     , v()
-    , vd()
-    , tau()  {
+    , vd()  {
     }
   robotArmQVVD_(const ContainerAllocator& _alloc)
     : header(_alloc)
     , q(_alloc)
     , v(_alloc)
-    , vd(_alloc)
-    , tau(_alloc)  {
+    , vd(_alloc)  {
   (void)_alloc;
     }
 
@@ -53,9 +51,6 @@ struct robotArmQVVD_
 
    typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double>> _vd_type;
   _vd_type vd;
-
-   typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double>> _tau_type;
-  _tau_type tau;
 
 
 
@@ -89,8 +84,7 @@ bool operator==(const ::dynamic_biped::robotArmQVVD_<ContainerAllocator1> & lhs,
   return lhs.header == rhs.header &&
     lhs.q == rhs.q &&
     lhs.v == rhs.v &&
-    lhs.vd == rhs.vd &&
-    lhs.tau == rhs.tau;
+    lhs.vd == rhs.vd;
 }
 
 template<typename ContainerAllocator1, typename ContainerAllocator2>
@@ -147,12 +141,12 @@ struct MD5Sum< ::dynamic_biped::robotArmQVVD_<ContainerAllocator> >
 {
   static const char* value()
   {
-    return "3871141b674f003bc326e4d8da08f4ad";
+    return "a7be9f5331e9207427b0c5c8ace7b977";
   }
 
   static const char* value(const ::dynamic_biped::robotArmQVVD_<ContainerAllocator>&) { return value(); }
-  static const uint64_t static_value1 = 0x3871141b674f003bULL;
-  static const uint64_t static_value2 = 0xc326e4d8da08f4adULL;
+  static const uint64_t static_value1 = 0xa7be9f5331e92074ULL;
+  static const uint64_t static_value2 = 0x27b0c5c8ace7b977ULL;
 };
 
 template<class ContainerAllocator>
@@ -175,7 +169,6 @@ struct Definition< ::dynamic_biped::robotArmQVVD_<ContainerAllocator> >
 "float64[] q\n"
 "float64[] v\n"
 "float64[] vd\n"
-"float64[] tau\n"
 "================================================================================\n"
 "MSG: std_msgs/Header\n"
 "# Standard metadata for higher-level stamped data types.\n"
@@ -213,7 +206,6 @@ namespace serialization
       stream.next(m.q);
       stream.next(m.v);
       stream.next(m.vd);
-      stream.next(m.tau);
     }
 
     ROS_DECLARE_ALLINONE_SERIALIZER
@@ -252,12 +244,6 @@ struct Printer< ::dynamic_biped::robotArmQVVD_<ContainerAllocator> >
     {
       s << indent << "  vd[" << i << "]: ";
       Printer<double>::stream(s, indent + "  ", v.vd[i]);
-    }
-    s << indent << "tau[]" << std::endl;
-    for (size_t i = 0; i < v.tau.size(); ++i)
-    {
-      s << indent << "  tau[" << i << "]: ";
-      Printer<double>::stream(s, indent + "  ", v.tau[i]);
     }
   }
 };

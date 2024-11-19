@@ -22,7 +22,7 @@ from typing import List, Optional, Union, Dict, Callable
 from tqdm import tqdm  
 
 
-from dynamic_biped.msg import robotArmInfo, recordArmHandPose, robotHandPosition, robot_hand_eff
+from dynamic_biped.msg import robotArmQVVD, recordArmHandPose, robotHandPosition, robot_hand_eff
 from dynamic_biped.srv import controlEndHand, controlEndHandRequest, controlEndHandResponse
 
 
@@ -31,7 +31,11 @@ from dynamic_biped.srv import controlEndHand, controlEndHandRequest, controlEndH
 DEFAULT_OBS_KEY_MAP = {
     "img":{
         "img01": {
-            "topic":"/head_camera/color/image_raw/compressed",
+            "topic":"/camera1/color/image_raw/compressed",
+            "msg_type":CompressedImage,
+            },
+        "img02": {
+            "topic":"/camera2/color/image_raw/compressed",
             "msg_type":CompressedImage,
             }
     },
@@ -51,7 +55,7 @@ DEFAULT_OBS_KEY_MAP = {
             },
         "state_joint": {
             "topic":"/robot_arm_q_v_tau",
-            "msg_type":robotArmInfo,
+            "msg_type":robotArmQVVD,
             },
         
         "cmd_gripper": {
@@ -93,7 +97,7 @@ class ObsBuffer:
             CompressedImage: self.compressedImage_callback,
             recordArmHandPose: self.recordArmHandPose_callback,
             JointState: self.joint_callback,
-            robotArmInfo: self.robotArmInfo_callback,
+            robotArmQVVD: self.robotArmQVVD_callback,
             robot_hand_eff: self.robot_hand_eff_callback,
             robotHandPosition: self.robotHandPosition_callback
         }
@@ -139,7 +143,7 @@ class ObsBuffer:
         self.obs_buffer_data[key]["data"].append(joint)
         self.obs_buffer_data[key]["timestamp"].append(msg.header.stamp.to_sec())
     
-    def robotArmInfo_callback(self, msg: robotArmInfo, key: str):
+    def robotArmQVVD_callback(self, msg: robotArmQVVD, key: str):
         # Float64Array ()
         joint = msg.q
         self.obs_buffer_data[key]["data"].append(joint)
