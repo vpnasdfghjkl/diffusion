@@ -30,6 +30,18 @@
             "justMyCode": true
         },
         {
+            "name": "debug KuavoToy",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                // "--config-name=train_diffusion_unet_real_image_workspace_first_task",
+                "--config-name=train_diffusion_unet_real_image_workspace_KuavoToy_task",
+            ],
+            "justMyCode": true
+        },
+        {
             // training.seed=42 training.device=cuda:0 hydra.run.dir='data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}'
             "name": "debug my rosbag dataset",
             "type": "debugpy",
