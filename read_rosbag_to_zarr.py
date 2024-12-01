@@ -370,8 +370,8 @@ def use_rosbag_to_show(bag_name):
     return img,aligned_img02,aligned_state_eef_pose,aligned_delta_cmd_eef_pose,aligned_cmd_eef_pose,aligned_state_joint,aligned_cmd_joint
 
 if __name__ == "__main__":
-    bag_folder_name = "toy_1"
-    bag_folder_path = "/home/lab/hanxiao/dataset/kuavo/task_toy/" + bag_folder_name
+    bag_folder_name = "toy_2"
+    bag_folder_path = "/media/camille/SATA1/task/Kuavo/task_toy/dataset/zarr/val/" + bag_folder_name
     
     save_plt_folder = f"{bag_folder_path}/plt"
     save_lastPic_folder = f"{bag_folder_path}/last_pic"
