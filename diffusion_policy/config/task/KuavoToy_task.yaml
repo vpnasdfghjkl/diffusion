@@ -1,8 +1,7 @@
 name: KuavoToy
 
-image_shape: [3, 256, 256]
-dataset_path: /app/dataset/kuavo/task_toy/toy_1/zarr/toy_1.zarr
-
+image_shape: [3, 384, 384]
+dataset_path: /home/lab/hanxiao/dataset/kuavo/Task1-RearangeToy/kuavo-zarr/Task1-RearangeToy.zarr
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
   obs:
@@ -13,10 +12,10 @@ shape_meta: &shape_meta
       shape: ${task.image_shape}
       type: rgb
     agent_pos:
-      shape: [7]
+      shape: [8]
       type: low_dim
   action: 
-    shape: [7]
+    shape: [8]
 
 env_runner:
   _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner

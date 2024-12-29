@@ -284,6 +284,7 @@ def use_rosbag_to_show(bag_name):
         # aligned_state_joint[i].append(aligned_state_hand[i])
         # aligned_cmd_eef_pose[i].append(aligned_cmd_hand[i])
         # aligned_state_eef_pose[i].append(aligned_state_hand[i])
+# 0 1 2 3 4 5 ins 6+1 
 
  # s 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
  # a 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
@@ -371,7 +372,7 @@ def use_rosbag_to_show(bag_name):
 
 if __name__ == "__main__":
     bag_folder_name = "toy_2"
-    bag_folder_path = "/media/camille/SATA1/task/Kuavo/task_toy/dataset/zarr/val/" + bag_folder_name
+    bag_folder_path = "/home/lab/hanxiao/dataset/kuavo/task_toy/" + bag_folder_name
     
     save_plt_folder = f"{bag_folder_path}/plt"
     save_lastPic_folder = f"{bag_folder_path}/last_pic"

@@ -23,7 +23,7 @@ class PushTImageDataset(BaseImageDataset):
         
         super().__init__()
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            zarr_path, keys=['img01', 'img02', 'eef_s', 'eef_a'])
+            zarr_path, keys=['img01', 'img02', 'state_joint_with_hand', 'cmd_joint_with_hand'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, 
             val_ratio=val_ratio,
@@ -59,8 +59,8 @@ class PushTImageDataset(BaseImageDataset):
 
     def get_normalizer(self, mode='limits', **kwargs):
         data = {
-            'agent_pos': self.replay_buffer['eef_s'][:,:7],
-            'action': self.replay_buffer['eef_a'][:,:7],
+            'agent_pos': self.replay_buffer['state_joint_with_hand'][:,:8],
+            'action': self.replay_buffer['cmd_joint_with_hand'][:,:8],
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -72,19 +72,19 @@ class PushTImageDataset(BaseImageDataset):
         return len(self.sampler)
 
     def _sample_to_data(self, sample):
-        agent_pos = sample['eef_s'].astype(np.float32) # (agent_posx2, block_posex3)
+        agent_pos = sample['state_joint_with_hand'].astype(np.float32) # (agent_posx2, block_posex3)
         img01 = np.moveaxis(sample['img01'],-1,1)/255
         img02 = np.moveaxis(sample['img02'],-1,1)/255
 
-        action = sample['eef_a'].astype(np.float32)
+        action = sample['cmd_joint_with_hand'].astype(np.float32)
 
         data = {
             'obs': {
                 'img01': img01, # T, C, H, W
                 'img02': img02, # T, C, H, W
-                'agent_pos': agent_pos[:,:7], # T, Do
+                'agent_pos': agent_pos[:,:8], # T, Do
             },
-            'action': action[:,:7] # T, 2
+            'action': action[:,:8] # T, 2
         }
         return data
     
