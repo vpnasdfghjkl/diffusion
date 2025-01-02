@@ -203,7 +203,7 @@ class ObsBuffer:
         for key, suber in self.suber_dict.items():
             suber.unregister()
 
-    def get_lastest_k_img(self, k: int) -> Dict[int, Dict[str, np.ndarray]]:
+    def get_lastest_k_img(self, k: int, from_:int=0) -> Dict[int, Dict[str, np.ndarray]]:
         """
         Return order T,H,W,C
         {
@@ -216,13 +216,19 @@ class ObsBuffer:
         """
         out = {}
         for i, key in enumerate(self.obs_key_map["img"]):
-            out[i] = {
-                "color": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
-                "timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
-            }
+            if from_ == 0:
+                out[i] = {
+                    "color": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
+                    "timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
+                }
+            else:
+                out[i] = {
+                    "color": np.array(list(self.obs_buffer_data[key]["data"])[-k-from_:-from_]),
+                    "timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k-from_:-from_]),
+                }
         return out
 
-    def get_latest_k_robotstate(self, k: int) -> dict:
+    def get_latest_k_robotstate(self, k: int, from_: int=0) -> dict:
         """
         Return order T,D
         {
@@ -235,10 +241,16 @@ class ObsBuffer:
         """
         out = {}
         for i, key in enumerate(self.obs_key_map["low_dim"]):
-            out[key] = {
-                "data": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
-                "robot_receive_timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
-            }
+            if from_ ==0:
+                out[key] = {
+                    "data": np.array(list(self.obs_buffer_data[key]["data"])[-k:]),
+                    "robot_receive_timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k:]),
+                }
+            else:
+                out[key] = {
+                    "data": np.array(list(self.obs_buffer_data[key]["data"])[-k-from_:-from_]),
+                    "robot_receive_timestamp": np.array(list(self.obs_buffer_data[key]["timestamp"])[-k-from_:-from_]),
+                }
         return out
     
     def wait_buffer_ready(self, just_img: bool = True):
@@ -357,7 +369,7 @@ class TargetPublisher:
             elif joint[i] > arm_max[i]:
                 joint[i] = arm_max[i]
         positions[0:7] = joint
-        print("send_angle:",[round(x,1) for x in joint])
+        # print("send_angle:",[round(x,1) for x in joint])
         velocities[0:7] = [0]*7
         joint_state.position = positions
         joint_state.velocity = velocities
@@ -451,14 +463,14 @@ class KuavoEnv:
         }
         
     # ========= async env API ===========
-    def get_obs(self, just_img: bool=False) -> dict:
+    def get_obs(self, just_img: bool=False, test_delay:float=0.1) -> dict:
         "observation dict"
         assert self.is_ready
 
         # get data
         # 30 Hz, camera_receive_timestamp
         k_image = math.ceil(self.n_obs_steps * (self.video_capture_fps / self.frequency))
-        self.last_realsense_data = self.obs_buffer.get_lastest_k_img(k_image)
+        self.last_realsense_data = self.obs_buffer.get_lastest_k_img(k_image, from_=int(test_delay/(1/self.video_capture_fps)))
         
         # both have more than n_obs_steps data
 
@@ -487,7 +499,7 @@ class KuavoEnv:
 
         if not just_img:
             k_robot = math.ceil(self.n_obs_steps * (self.robot_publish_rate / self.frequency))
-            last_robot_data = self.obs_buffer.get_latest_k_robotstate(k_robot)
+            last_robot_data = self.obs_buffer.get_latest_k_robotstate(k_robot, from_=int(test_delay/(1/self.robot_publish_rate)))
             # align robot obs timestamps
             robot_obs = dict()
             robot_obs_timestamps = dict()
@@ -539,7 +551,6 @@ class KuavoEnv:
     def exec_actions(
         self,
         actions: np.ndarray,
-        latency: float,
         start_point: time,
         cur_state: Optional[np.ndarray] = None,
     ):  
@@ -552,20 +563,17 @@ class KuavoEnv:
         new_actions = actions
         # with open("cur_state.txt", "a") as f:
         #     f.write(str(cur_state) + "\n")
+        print('this send time============>',time.time())
         for i in range(len(new_actions)):
             # self.target_publisher.publish_target_pose(new_actions[i, :-1])
             self.target_publisher.publish_target_joint(new_actions[i, :-1])
-            print('==========================================',time.time()-start_point)
+            # print('==========================================',time.time()-start_point)
             if new_actions[i, -1] > 0.5:
                 self.target_publisher.control_hand(left_hand_position=list(map(int, self.hand_close_state[1:-1].split(", ")))[:6], right_hand_position=[0, 0, 0, 0, 0, 0])
             else:
                 self.target_publisher.control_hand(left_hand_position=list(map(int, self.hand_open_state[1:-1].split(", ")))[:6], right_hand_position=[0, 0, 0, 0, 0, 0])
-            time.sleep(latency)
-        # # record actions
-        # if self.action_accumulator is not None:
-        #     self.action_accumulator.put(new_actions, new_timestamps)
-        # if self.stage_accumulator is not None:
-        #     self.stage_accumulator.put(new_stages, new_timestamps)
+            time.sleep(0.1)
+      
     
     def check_timestamps_diff(self, check_steps=50):
         all_delta_cam0101_cam0201 = []

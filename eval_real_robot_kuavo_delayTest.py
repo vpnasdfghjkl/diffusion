@@ -33,7 +33,7 @@ import pathlib
 import skvideo.io
 from omegaconf import OmegaConf
 import scipy.spatial.transform as st
-from diffusion_policy.real_world.real_env_kuavo import KuavoEnv
+from diffusion_policy.real_world.real_env_kuavo_delayTest import KuavoEnv
 # from diffusion_policy.real_world.spacemouse_shared_memory import Spacemouse
 from diffusion_policy.common.precise_sleep import precise_wait
 from diffusion_policy.real_world.real_inference_util import (
@@ -103,7 +103,7 @@ def main():
 
     # setup experiment
     dt = 1/frequency
-
+    
     obs_res = get_real_obs_resolution(cfg.task.shape_meta)
     n_obs_steps = cfg.n_obs_steps
     print("n_obs_steps: ", n_obs_steps)
@@ -136,11 +136,11 @@ def main():
             }
             '''
             print("Warming up policy inference")
-            latency = 0
+            latency = 750   #ms
             current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
             output_video_path = f'./{cfg.task.name}_{current_time}_speedx1_latency{latency}ms.mp4'
             stop_event = threading.Event()  
-            record_title = f"Latency of [Obs_trans, PredictRet_trans, Motor] =[{latency}ms, {latency}ms, {latency}ms]"
+            record_title = f"Latency of [Obs_trans, PredictRet_trans] =[{latency}ms, {latency}ms]"
             video_thread = threading.Thread(target=env.record_video, args=(output_video_path, 640, 480, 30, True,stop_event,record_title))
             video_thread.start()
             
@@ -176,9 +176,6 @@ def main():
                     iter_idx = 0
                     
                     
-                    import matplotlib.pyplot as plt
-
-                    
                     import imageio
                     current_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
                     output_video_path = f'./{cfg.task.name}_{current_time}_speedx_latency{latency}ms.mp4'
@@ -189,9 +186,9 @@ def main():
 
                         # get obs
                         # print('get_obs')
-                        obs,_,_,_,_ = env.get_obs()
+                        test_delay = latency/1000
+                        obs,_,_,_,_ = env.get_obs(just_img=False,test_delay=latency/1000)
                         start_point = time.time()
-                        time.sleep(latency/1000)
                         obs_timestamps = obs['timestamp']
                         # print(f'Obs latency {time.time() - obs_timestamps[-1]}')
                         
@@ -225,17 +222,14 @@ def main():
                         # 处理按键事件，按'q'退出
                         if cv2.waitKey(1) & 0xFF == ord('q'):
                             break
-                        
-                        # writer.append_data(cv2.cvtColor(concatenated_img, cv2.COLOR_BGR2RGB))
-
-                        
+                    
 
                         with open('inference_latency.txt', 'a') as f:
                             # run inference
                             with torch.no_grad():
                                 obs_dict_np = get_real_obs_dict(
                                     env_obs=obs, shape_meta=cfg.task.shape_meta)
-                                print("eef_s", obs_dict_np['agent_pos'][-1])
+                                # print("eef_s", obs_dict_np['agent_pos'][-1])
                                 obs_dict = dict_apply(obs_dict_np, 
                                     lambda x: torch.from_numpy(x).unsqueeze(0).to(device))
                                 s = time.time()
@@ -249,19 +243,28 @@ def main():
                                 action = result['action'][0].detach().to('cpu').numpy()
                                 # 计算推理所用的时长
                                 # print('Inference latency:', time.time() - s)
-                        time.sleep(latency/1000)
+                        # 回调函数：在Buffer中数据被弹出时调用exec_actions
+                        def execute_action(action):
+                            # print("Executing action:", action)
+                            env.exec_actions(
+                                actions=action[:8],
+                                cur_state=obs_dict_np['agent_pos'][-1][:6],
+                                start_point=start_point,
+                            )
+                        # 初始化Buffer，设置弹出时间间隔
+                        from delayTimer import FixedTimeBuffer
+                        buffer = FixedTimeBuffer(pop_interval=latency / 1000, exec_callback=execute_action)
+                        buffer.add(action)
+                        time.sleep(0.8 + latency / 1000)
+        
                         # # clip actions
                         # this_target_poses[:,:2] = np.clip(
                         #     this_target_poses[:,:2], [0.25, -0.45], [0.77, 0.40])
 
-                        # execute actions
-                        for act in action:
-                            print("act", act)
-                        print("\n\n")
-                        print('--------------------------',time.time() - start_point)
-                        env.exec_actions(
-                            actions=action[:8],cur_state=obs_dict_np['agent_pos'][-1][:6],start_point=start_point,latency=latency/1000,
-                        )
+                        # print('--------------------------',time.time() - start_point)
+                        # env.exec_actions(
+                        #     actions=action[:8],cur_state=obs_dict_np['agent_pos'][-1][:6],start_point=start_point
+                        # )
                         # print(f"Submitted {len(action)} steps of actions.")
 
                     cv2.destroyAllWindows()
