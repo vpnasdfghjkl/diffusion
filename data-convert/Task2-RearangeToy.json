@@ -1,0 +1,97 @@
+{
+    "TASK_TIME": 10.0,
+    "CAM_HZ": 30,
+    "TRAIN_HZ": 10,
+    "SAMPLE_DROP": 2,
+    "HAND_OPEN_STATE": "[0, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]",
+    "HAND_CLOSE_STATE": "[59, 99, 32, 44, 51, 50, 0, 0, 0, 0, 0, 0]",
+    "DEFAULT_OBS_KEY_MAP": {
+        "img": {
+            "img01": {
+                "topic": "/cam_1/color/image_raw/compressed",
+                "msg_type": "CompressedImage",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_compressed_image",
+                    "params": {
+                        "resize": [384, 384]
+                    }
+                }
+            },
+            "img02": {
+                "topic": "/cam_2/color/image_raw/compressed",
+                "msg_type": "CompressedImage",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_compressed_image",
+                    "params": {
+                        "resize": [384, 384]
+                    }
+                }
+            }
+        },
+        "low_dim": {
+            "cmd_eef": {
+                "topic": "/fk/cmd_eef",
+                "msg_type": "twoArmHandPose",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_record_arm_hand_pose",
+                    "params": {}
+                }
+            },
+            "state_eef": {
+                "topic": "/fk/state_eef",
+                "msg_type": "twoArmHandPose",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_record_arm_hand_pose",
+                    "params": {}
+                }
+            },
+            "cmd_joint": {
+                "topic": "/kuavo_arm_traj",
+                "msg_type": "JointState",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_joint",
+                    "params": {
+                        "is_cmd": true
+                    }
+                }
+            },
+            "state_joint": {
+                "topic": "/robot_arm_q_v_tau",
+                "msg_type": "robotArmQVVD",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_joint",
+                    "params": {
+                        "is_cmd": false
+                    }
+                }
+            },
+            "cmd_hand": {
+                "topic": "/robot_hand_eff",
+                "msg_type": "robot_hand_eff",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_hand_data",
+                    "params": {
+                        "is_cmd": true,
+                        "is_binary": true,
+                        "HAND_CLOSE_STATE": "$HAND_CLOSE_STATE"
+                    }
+                }
+            },
+            "state_hand": {
+                "topic": "/robot_hand_position",
+                "msg_type": "robotHandPosition",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_hand_data",
+                    "params": {
+                        "is_cmd": false,
+                        "is_binary": true
+                    }
+                }
+            }
+        }
+    },
+    "img_resize": {
+        "img01": [384, 384],
+        "img02": [384, 384]
+    }
+}
