@@ -26,6 +26,16 @@
                         "resize": [384, 384]
                     }
                 }
+            },
+            "img03": {
+                "topic": "/cam_3/color/compressed",
+                "msg_type": "CompressedImage",
+                "handle": {
+                    "processor": "utils.msg_process.ProcessUtil.process_compressed_image",
+                    "params": {
+                        "resize": [384, 384]
+                    }
+                }
             }
         },
         "low_dim": {
@@ -92,6 +102,7 @@
     },
     "img_resize": {
         "img01": [384, 384],
-        "img02": [384, 384]
+        "img02": [384, 384],
+        "img03": [384, 384]
     }
 }

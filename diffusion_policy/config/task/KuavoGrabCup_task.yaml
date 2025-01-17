@@ -1,0 +1,40 @@
+name: KuavoGrabCup
+
+image_shape: [3, 384, 384]
+dataset_path: /media/lab/PortableSSD/DATASET/Task4-GrabCup/kuavo-zarr/Task4-GrabCup.zarr
+shape_meta: &shape_meta
+  # acceptable types: rgb, low_dim
+  obs:
+    img01:
+      shape: ${task.image_shape}
+      type: rgb
+    img02:
+      shape: ${task.image_shape}
+      type: rgb
+    img03:
+      shape: ${task.image_shape}
+      type: rgb
+    agent_pos:
+      shape: [8]
+      type: low_dim
+  action: 
+    shape: [8]
+
+env_runner:
+  _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner
+
+dataset:
+  _target_: diffusion_policy.dataset.pusht_image_dataset_KuavoGrabCup_task.PushTImageDataset
+  # shape_meta: *shape_meta
+  zarr_path: ${task.dataset_path}
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  # n_obs_steps: ${dataset_obs_steps}
+  # n_latency_steps: ${n_latency_steps}
+  # use_cache: True
+  seed: 42
+  val_ratio: 0.01
+  max_train_episodes: null
+  # delta_action: False
+

@@ -30,6 +30,8 @@ class Config:
                 "/robot_hand_position": lambda msg: ProcessUtil.process_hand_data(msg, is_cmd=False, is_binary=True),
                 "/cam_1/color/image_raw/compressed": lambda msg: ProcessUtil.process_compressed_image(msg, resize=(self.img_resize["img01"][0], self.img_resize["img01"][1])),
                 "/cam_2/color/image_raw/compressed": lambda msg: ProcessUtil.process_compressed_image(msg, resize=(self.img_resize["img02"][0], self.img_resize["img02"][1])),
+                "/cam_3/color/compressed": lambda msg: ProcessUtil.process_compressed_image(msg, resize=(self.img_resize["img03"][0], self.img_resize["img03"][1])),
+                
             }
     @classmethod
     def from_json(cls, json_file: str):

@@ -560,7 +560,7 @@ class KuavoEnv:
                 self.target_publisher.control_hand(left_hand_position=list(map(int, self.hand_close_state[1:-1].split(", ")))[:6], right_hand_position=[0, 0, 0, 0, 0, 0])
             else:
                 self.target_publisher.control_hand(left_hand_position=list(map(int, self.hand_open_state[1:-1].split(", ")))[:6], right_hand_position=[0, 0, 0, 0, 0, 0])
-            time.sleep(latency)
+            time.sleep(0.1)
         # # record actions
         # if self.action_accumulator is not None:
         #     self.action_accumulator.put(new_actions, new_timestamps)

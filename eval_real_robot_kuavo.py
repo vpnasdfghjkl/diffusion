@@ -33,7 +33,9 @@ import pathlib
 import skvideo.io
 from omegaconf import OmegaConf
 import scipy.spatial.transform as st
-from diffusion_policy.real_world.real_env_kuavo import KuavoEnv
+# from diffusion_policy.real_world.real_env_kuavo import KuavoEnv
+# from diffusion_policy.real_world.real_env_kuavo_cup import KuavoEnv
+from diffusion_policy.real_world.real_env_kuavo_B import KuavoEnv
 # from diffusion_policy.real_world.spacemouse_shared_memory import Spacemouse
 from diffusion_policy.common.precise_sleep import precise_wait
 from diffusion_policy.real_world.real_inference_util import (
@@ -53,11 +55,15 @@ import multiprocessing
 
 input="/app/diffusion/data/outputs/2024.12.01/20.25.02_train_diffusion_unet_image_KuavoToy/checkpoints/latest.ckpt" # joint
 input="/home/lab/hanxiao/diffusion/data/outputs/2024.12.01/20.25.02_train_diffusion_unet_image_KuavoToy/checkpoints/latest.ckpt" # joint
-input="/home/lab/hanxiao/diffusion/data/outputs/2024.12.28/00.25.07_train_diffusion_unet_image_KuavoToy/checkpoints/epoch=0050-train_loss=0.014.ckpt" # joint
+input="/home/lab/hanxiao/diffusion/data/outputs/2024.12.28/00.25.07_train_diffusion_unet_image_KuavoToy/checkpoints/epoch=0250-train_loss=0.002.ckpt" # joint
+input="/home/lab/hanxiao/diffusion/data/outputs/2025.01.15/15.30.25_train_diffusion_unet_image_KuavoGrabCup/checkpoints/epoch=0050-train_loss=0.011.ckpt"
+input="/home/lab/hanxiao/diffusion/data/outputs/2025.01.16/22.24.19_train_diffusion_unet_image_KuavoGrabB/checkpoints/epoch=0100-train_loss=0.012.ckpt"
 
 output="/home/lab/hanxiao/diffusion/data/outputs/2024.12.01/20.25.02_train_diffusion_unet_image_KuavoToy/checkpoints/output" # joint
 output="/home/lab/hanxiao/diffusion/data/outputs/2024.11.28/15.13.53_train_diffusion_unet_image_KuavoToy/checkpoints/output"
 output="/home/lab/hanxiao/diffusion/data/outputs/2024.12.28/00.25.07_train_diffusion_unet_image_KuavoToy/checkpoints/output" # joint
+output="/home/lab/hanxiao/diffusion/data/outputs/2025.01.15/15.30.25_train_diffusion_unet_image_KuavoGrabCup/checkpoints/output"
+output="/home/lab/hanxiao/diffusion/data/outputs/2025.01.16/22.24.19_train_diffusion_unet_image_KuavoGrabB/checkpoints/output"
 
 vis_camera_idx=1
 steps_per_inference=6
@@ -257,6 +263,7 @@ def main():
                         # execute actions
                         for act in action:
                             print("act", act)
+                            break
                         print("\n\n")
                         print('--------------------------',time.time() - start_point)
                         env.exec_actions(

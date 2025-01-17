@@ -108,7 +108,7 @@ class RosbagReader:
 
         # Convert lists to numpy arrays and apply sampling
         for key in aligned_data:
-            if key in ['img01', 'img02']:
+            if key in ['img01', 'img02', 'img03']:
                 aligned_data[key] = np.array(aligned_data[key], dtype=np.uint8)
             else:
                 aligned_data[key] = np.array(aligned_data[key])
@@ -152,6 +152,7 @@ class RosbagReader:
         result_data = {
             'img01': imgs[1:],
             'img02': aligned_data['img02'][1:],
+            'img03': aligned_data['img03'][1:],
             'state_joint_with_hand': aligned_data['state_joint_with_hand'][1:],
             'cmd_joint_with_hand': aligned_data['cmd_joint_with_hand'][1:],
             'state_eef_with_hand': aligned_data['state_eef_with_hand'][1:],
@@ -166,7 +167,7 @@ class RosbagReader:
             'cmd_hand': aligned_data['cmd_hand'][1:],
             'timestamp': aligned_data['timestamp'][1:],
         }
-        for img in ['img01', 'img02']:
+        for img in ['img01', 'img02', 'img03']:
             os.makedirs(zarr_video_folder + f"/{self.base_name}", exist_ok=True)
             self._save_video(output_video=zarr_video_folder + f"/{self.base_name}/{img}.mp4", img_array=result_data[img], fps=10)
             os.makedirs(sample_video_folder + f"/{self.base_name}", exist_ok=True)
